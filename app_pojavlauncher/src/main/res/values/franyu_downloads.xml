@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dl_no_internet">No internet connection. Waiting for the connection to return…</string>
+    <string name="dl_paused_offline">Download paused: no internet connection. Resuming automatically when connection returns…</string>
+</resources>
