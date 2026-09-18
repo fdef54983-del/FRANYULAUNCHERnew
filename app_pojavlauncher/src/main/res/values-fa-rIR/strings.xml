@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- App name part -->
     <string name="app_name">FranyuLauncher</string>
-    <string name="app_short_name">پوجاو لانچر</string>
+    <string name="app_short_name">FranyuLauncher</string>
     <!-- Action bar part -->
     <!-- Languages list part -->
     <!-- Login strings -->
@@ -14,7 +14,7 @@
     <!-- AlertDialog title -->
     <string name="alerttitle_installmod">یک نصب کننده ماد را انتخاب کنید</string>
     <!-- Error messages -->
-    <string name="error_fatal">پوجاو لانچر بصورت غیرمنتظره کرش خورد</string>
+    <string name="error_fatal">FranyuLauncher بصورت غیرمنتظره کرش خورد</string>
     <string name="error_no_version">بدون ورژن!</string>
     <string name="error_show_more">نمایش بیشتر</string>
     <string name="error_show_less">نمایش کمتر</string>

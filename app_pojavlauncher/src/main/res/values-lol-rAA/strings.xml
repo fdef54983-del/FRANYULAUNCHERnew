@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- App name part -->
     <string name="app_name">FranyuLauncher</string>
-    <string name="app_short_name">Punjabi launcher</string>
+    <string name="app_short_name">FranyuLauncher</string>
     <!-- Action bar part -->
     <!-- Languages list part -->
     <!-- Login strings -->
@@ -276,7 +276,7 @@
     <string name="modpack_download_downloading_mods">Downloading mods (%.2f MB / %.2f MB)</string>
     <string name="modpack_download_downloading_mods_fc">Downloading mods (File %d out of %d)</string>
     <string name="modpack_download_applying_overrides">Applying overrides (%d/%d)</string>
-    <string name="modpack_install_notification_title">Mojo Modpack Installer really gud</string>
+    <string name="modpack_install_notification_title">Franyu Modpack Installer really gud</string>
     <string name="modpack_install_notification_success">Click here to finish modpack installation</string>
     <string name="modpack_install_notification_data_not_available">Failed to download mod loader information please stay like a sigma 😎😎</string>
     <string name="modpack_install_modloader_download_failed">Failed to download the mod loader files</string>
@@ -305,7 +305,7 @@ if yu wanna use teh offishul download source, press "switch to offishul site" n 
     <string name="preference_category_miscellaneous">Miscellaneous settings</string>
     <string name="preference_category_video">Video settings</string>
     <string name="notification_permission_dialog_title">Permission request</string>
-    <string name="notification_permission_dialog_text">Punjabi launcher requirez a permisshun to post notifishunz to prevent game/modpack downloadz frum stoppin wen yu leev teh app. wifout dis permisshun, android may shut down ur downloadz wen yu put launcher in background mode stay open.</string>
+    <string name="notification_permission_dialog_text">FranyuLauncher requirez a permisshun to post notifishunz to prevent game/modpack downloadz frum stoppin wen yu leev teh app. wifout dis permisshun, android may shut down ur downloadz wen yu put launcher in background mode stay open.</string>
     <string name="notification_permission_toast">You can always change your mind later by going into Settings</string>
     <string name="preference_ask_for_notification_title">Allow notifications</string>
     <string name="preference_ask_for_notification_description">click to re-request teh notifishun permisshun, required for game/modpack background downloadz to werk properly.</string>
