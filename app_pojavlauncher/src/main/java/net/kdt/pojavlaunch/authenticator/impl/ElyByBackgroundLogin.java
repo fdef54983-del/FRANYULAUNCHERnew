@@ -22,6 +22,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.Callable;
 
+import git.artdeell.mojo.BuildConfig;
+
 public class ElyByBackgroundLogin implements BackgroundLogin {
     public static final BackgroundLogin.Creator CREATOR = ElyByBackgroundLogin::new;
 
@@ -34,10 +36,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
 
     private ElyByBackgroundLogin() {}
 
-    private void acquireAccountDetails(
-            @NonNull LoginListener loginListener, Callable<Void> continuation,
-            String code, boolean isRefresh
-    ) {
+    private void acquireAccountDetails(@NonNull LoginListener loginListener, Callable<Void> continuation, String code, boolean isRefresh) {
         ProgressLayout.setProgress(ProgressLayout.AUTHENTICATE, 0);
         sExecutorService.execute(() -> {
             loginListener.setMaxLoginProgress(2);
@@ -47,7 +46,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
                 notifyProgress(loginListener, 2);
                 mAccountInfo = acquireAccountData(mOAuthData.accessToken);
                 continuation.call();
-            }catch (Exception e){
+            } catch (Exception e) {
                 Log.e("MicroAuth", "Exception thrown during authentication", e);
                 loginListener.onLoginError(e);
             }
@@ -68,7 +67,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
 
     @Override
     public void createAccount(@NonNull LoginListener loginListener, String code) {
-        acquireAccountDetails(loginListener, ()->{
+        acquireAccountDetails(loginListener, () -> {
             MinecraftAccount account = PojavProfile.createAccount(this::fillAccount);
             Tools.runOnUiThread(() -> loginListener.onLoginDone(account));
             return null;
@@ -77,7 +76,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
 
     @Override
     public void refreshAccount(@NonNull LoginListener loginListener, MinecraftAccount account) {
-        acquireAccountDetails(loginListener, ()->{
+        acquireAccountDetails(loginListener, () -> {
             fillAccount(account);
             account.save();
             Tools.runOnUiThread(() -> loginListener.onLoginDone(account));
@@ -86,40 +85,40 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
     }
 
     private void acquireTokens(boolean isRefresh, String code) throws IOException {
+        if(BuildConfig.ELYBY_CLIENT_ID.isEmpty() || BuildConfig.ELYBY_CLIENT_SECRET.isEmpty()) {
+            throw new IOException("Ely.by OAuth is not configured for FranyuLauncher. Register FranyuLauncher and configure ELYBY_CLIENT_ID and ELYBY_CLIENT_SECRET in the build environment.");
+        }
         URL url = new URL(authTokenUrl);
-        Log.i("MicrosoftLogin", "isRefresh=" + isRefresh + ", authCode= "+code);
-
         String formData = CommonLoginUtils.convertToFormData(
-                "client_id", "mojolauncher2",
-                "client_secret", "o14Zb2Zzj0_k6o4kN0t1mIEhoQxeayn8hYi5VSX2q3NXrdQm5T2Q6wqsCfpv1vhu",
+                "client_id", BuildConfig.ELYBY_CLIENT_ID,
+                "client_secret", BuildConfig.ELYBY_CLIENT_SECRET,
                 "redirect_uri", "internalredirect://complete",
                 isRefresh ? "refresh_token" : "code", code,
                 "grant_type", isRefresh ? "refresh_token" : "authorization_code"
         );
         mOAuthData = CommonLoginUtils.exchangeAuthCode(url, formData);
-        mExpiresAt = mOAuthData.expiresIn*1000 + System.currentTimeMillis();
+        mExpiresAt = mOAuthData.expiresIn * 1000 + System.currentTimeMillis();
     }
 
     private ElyAccountInfo acquireAccountData(String accessToken) throws IOException {
         URL url = new URL(accountInfoUrl);
-        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestProperty("Authorization", "Bearer " + accessToken);
         conn.setUseCaches(false);
         conn.connect();
         if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
-            try (InputStreamReader reader = new InputStreamReader(conn.getInputStream())) {
+            try(InputStreamReader reader = new InputStreamReader(conn.getInputStream())) {
                 return Tools.GLOBAL_GSON.fromJson(reader, ElyAccountInfo.class);
             } finally {
                 conn.disconnect();
             }
-        }else{
-            throw CommonLoginUtils.getResponseThrowable(conn);
         }
+        throw CommonLoginUtils.getResponseThrowable(conn);
     }
 
-    private void notifyProgress(LoginListener listener, int step){
+    private void notifyProgress(LoginListener listener, int step) {
         Tools.runOnUiThread(() -> listener.onLoginProgress(step));
-        ProgressLayout.setProgress(ProgressLayout.AUTHENTICATE, step*50);
+        ProgressLayout.setProgress(ProgressLayout.AUTHENTICATE, step * 50);
     }
 
     private static class ElyAccountInfo {
