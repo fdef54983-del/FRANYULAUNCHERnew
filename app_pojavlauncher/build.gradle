@@ -99,13 +99,12 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix '.debug'
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.customDebug
-            resValue 'string', 'application_package', 'com.franyu.launcher.debug'
-            resValue 'string', 'storageProviderAuthorities', 'com.franyu.launcher.scoped.gamefolder.debug'
+            resValue 'string', 'application_package', 'com.franyu.launcher'
+            resValue 'string', 'storageProviderAuthorities', 'com.franyu.launcher.scoped.gamefolder'
         }
         proguard {
             initWith debug
@@ -121,9 +120,6 @@ android {
             // Don't set to true or java.awt will be a.a or something similar.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // defaultConfig already set
-            // multiDexEnabled = true
-            // debuggable = true
             resValue 'string', 'storageProviderAuthorities', 'com.franyu.launcher.scoped.gamefolder'
             resValue 'string', 'application_package', 'com.franyu.launcher'
         }
@@ -175,49 +171,35 @@ class AssetTaskRegistrar {
 
     AssetTaskRegistrar(Project project) {
         this.project = project
-
         targetDownloadDir = new File(project.projectDir, "build/intermediates/download_deps")
         projectJarDir = new File(project.projectDir, "build/intermediates/package_jar_deps")
         createDirectories targetDownloadDir
         createDirectories projectJarDir
     }
-
     def setVariant(variant) {
         variantName = variant.getName().capitalize()
         mergeAssetsTask = variant.getPreBuildProvider().get()
-
         targetAssetsDir = new File(project.projectDir, "build/intermediates/remote_asset_set/${variantName.toLowerCase()}/")
         createDirectories(targetAssetsDir)
-
         project.android.sourceSets[variant.getName()].assets.srcDirs += targetAssetsDir.absolutePath
     }
-
     static def createDirectories(File location) {
-        if(!location.isDirectory() && !location.mkdirs())
-            throw new RuntimeException("Failed to create directory "+location.getAbsolutePath())
+        if(!location.isDirectory() && !location.mkdirs()) throw new RuntimeException("Failed to create directory "+location.getAbsolutePath())
     }
-
     static def writeVersion(File dir) {
         File versionFile = new File(dir, "version")
         versionFile.write(String.valueOf(new Date().getTime()))
     }
-
-    private def assetDestination(String relativePath) {
-        return new File(targetAssetsDir, relativePath)
-    }
-
+    private def assetDestination(String relativePath) { return new File(targetAssetsDir, relativePath) }
     private def onlineUnzipTask(String downloadUrl, String name, File targetExtractionDir) {
         createDirectories targetExtractionDir
-
         def downloadTarget = new File(targetDownloadDir, name)
-
         def dependencySuffix = "${name}${variantName}"
         def downloadTask = project.tasks.register("download${dependencySuffix}", Download) {
             src downloadUrl
             dest downloadTarget
             overwrite false
         }
-
         def unzipTask = project.tasks.register("unzip${dependencySuffix}", Copy) {
             from project.zipTree(downloadTarget)
             into targetExtractionDir
@@ -225,26 +207,21 @@ class AssetTaskRegistrar {
         }
         return unzipTask
     }
-
     def onlineZipDependency(String downloadUrl, String name, String relativePath) {
         mergeAssetsTask.dependsOn(onlineUnzipTask downloadUrl, name, assetDestination(relativePath))
     }
-
     def projectJarDependency(Project project, String relativePath) {
         def assetTargetDir = assetDestination(relativePath)
         def jarTargetDir = new File(projectJarDir, relativePath)
         createDirectories assetTargetDir
         createDirectories jarTargetDir
-
         def copyTaskName = "copyProjectJar${jarTargetDir.getName()}${variantName}"
         def copyTask = project.tasks.register(copyTaskName, Copy) {
             from jarTargetDir
             into assetTargetDir
             dependsOn ":${project.name}:jar"
         }
-
         mergeAssetsTask.dependsOn copyTask
-
         project.tasks.withType(org.gradle.jvm.tasks.Jar.class).configureEach {
             it.destinationDirectory = jarTargetDir
             doLast {
@@ -253,8 +230,7 @@ class AssetTaskRegistrar {
             }
         }
     }
-
-    def onlineJarDependency(String jarUrl, String jarProject, String dependency, String version, String suffix,  String relativePath) {
+    def onlineJarDependency(String jarUrl, String jarProject, String dependency, String version, String suffix, String relativePath) {
         File targetDir = assetDestination(relativePath)
         createDirectories targetDir
         def dependencySuffix = "${jarProject}${dependency}${variantName}"
@@ -269,7 +245,6 @@ class AssetTaskRegistrar {
         }
         mergeAssetsTask.dependsOn(downloadTask)
     }
-
     def jreRuntimeDependency(int version, String relPath) {
         def jreUrl = "https://github.com/MojoLauncher/android-openjdk-build-multiarch/releases/download/rolling/jre%d-pojav.zip"
         onlineZipDependency(String.format(jreUrl, version), "ComponentRuntime$version", relPath)
@@ -278,24 +253,18 @@ class AssetTaskRegistrar {
 
 afterEvaluate {
     def registrar = new AssetTaskRegistrar(project)
-
     android.applicationVariants.configureEach { variant ->
         registrar.setVariant(variant)
-
         registrar.projectJarDependency project(":forge_installer"), "components/forge_installer"
         registrar.projectJarDependency project(":jre_lwjgl3glfw"), "components/lwjgl3"
-
         if (variant.getName().toLowerCase().contains("full")) {
             registrar.jreRuntimeDependency 8, "components/jre"
             registrar.jreRuntimeDependency 17, "components/jre-new"
             registrar.jreRuntimeDependency 21, "components/jre-21"
         }
-        
         def cacioJarUrl = "https://jitpack.io/com/github/MojoLauncher/%1\$s/%2\$s/%3\$s/%2\$s-%3\$s%4\$s.jar"
-
         registrar.onlineJarDependency cacioJarUrl, "caciocavallo", "cacio-shared", "-33120de13d-1", "", "components/caciocavallo"
         registrar.onlineJarDependency cacioJarUrl, "caciocavallo", "cacio-androidnw", "-33120de13d-1", "", "components/caciocavallo"
-
         registrar.onlineJarDependency cacioJarUrl, "caciocavallo17", "cacio-tta", "72a9ab6323", "-jar-with-dependencies", "components/caciocavallo17"
     }
 }
