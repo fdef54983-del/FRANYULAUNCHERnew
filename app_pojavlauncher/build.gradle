@@ -11,35 +11,32 @@ import de.undercouch.gradle.tasks.download.Download
 static def getDate() { return new Date().format('yyyyMMdd') }
 
 static def getDateSeconds() {
-    if (System.getenv("GITHUB_ACTIONS") == "true") {
-        return Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER"))
-    } else {
-        return 172005
-    }
+    if (System.getenv("GITHUB_ACTIONS") == "true") return Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER"))
+    return 172005
 }
 
 def getVersionName = {
     def currentBranch = grgit.branch.current()
     def latestCommit = grgit.log(maxCommits: 1)
     def dateToday = getDate()
-    if(currentBranch == null || latestCommit == null) {
-        return "LOCAL-${dateToday}"
-    }else {
-        def branchName = currentBranch.getName()
-        def commitAbbreviation = latestCommit.abbreviatedId
-        return "hebe-${dateToday}-${commitAbbreviation}-${branchName}"
-    }
+    if(currentBranch == null || latestCommit == null) return "LOCAL-${dateToday}"
+    def branchName = currentBranch.getName()
+    def commitAbbreviation = latestCommit.abbreviatedId
+    return "1.2-${dateToday}-${commitAbbreviation}-${branchName}"
 }
 
 def getCFApiKey = {
     String key = System.getenv("CURSEFORGE_API_KEY")
     if(key != null) return key
     File curseforgeKeyFile = new File("./curseforge_key.txt")
-    if(curseforgeKeyFile.canRead() && curseforgeKeyFile.isFile()) {
-        return curseforgeKeyFile.text
-    }
+    if(curseforgeKeyFile.canRead() && curseforgeKeyFile.isFile()) return curseforgeKeyFile.text
     logger.warn('BUILD: You have no CurseForge key, the curseforge api will get disabled !')
     return "DUMMY"
+}
+
+def getEnvOrEmpty = { String name ->
+    String value = System.getenv(name)
+    return value == null ? "" : value.replace("\\", "\\\\").replace('"', '\\"')
 }
 
 configurations {
@@ -51,12 +48,9 @@ configurations {
 
 android {
     namespace 'git.artdeell.mojo'
-
     compileSdk = 36
 
-    lintOptions {
-        abortOnError false
-    }
+    lintOptions { abortOnError false }
 
     signingConfigs {
         customDebug {
@@ -74,23 +68,20 @@ android {
     }
 
     defaultConfig {
-        // FranyuLauncher application identity. Keep the Java namespace stable for this iteration.
         applicationId "com.franyu.launcher"
         minSdkVersion 21
         targetSdkVersion 35
         versionCode getDateSeconds()
         versionName getVersionName()
-        multiDexEnabled true //important
+        multiDexEnabled true
         resValue 'string', 'curseforge_api_key', getCFApiKey()
+        buildConfigField 'String', 'ELYBY_CLIENT_ID', '"' + getEnvOrEmpty('ELYBY_CLIENT_ID') + '"'
+        buildConfigField 'String', 'ELYBY_CLIENT_SECRET', '"' + getEnvOrEmpty('ELYBY_CLIENT_SECRET') + '"'
     }
 
-    flavorDimensions  = ["runtime"]
-    
+    flavorDimensions = ["runtime"]
     productFlavors {
-        full {
-            dimension "runtime"
-        }
-        
+        full { dimension "runtime" }
         noruntime {
             dimension "runtime"
             versionNameSuffix "-noruntime"
@@ -115,9 +106,7 @@ android {
             initWith proguard
             debuggable false
         }
-
         release {
-            // Don't set to true or java.awt will be a.a or something similar.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             resValue 'string', 'storageProviderAuthorities', 'com.franyu.launcher.scoped.gamefolder'
@@ -130,31 +119,18 @@ android {
     }
 
     ndkVersion = "28.2.13676358"
-
     externalNativeBuild {
-        ndkBuild {
-            path file('src/main/jni/Android.mk')
-        }
+        ndkBuild { path file('src/main/jni/Android.mk') }
     }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-
-    bundle {
-        language {
-            enableSplit = false
-        }
-    }
-
+    bundle { language { enableSplit = false } }
     packagingOptions {
-        jniLibs {
-            useLegacyPackaging = true
-        }
+        jniLibs { useLegacyPackaging = true }
         pickFirst '**/libbytehook.so'
     }
-
     buildFeatures {
         prefab true
         buildConfig true
@@ -224,10 +200,7 @@ class AssetTaskRegistrar {
         mergeAssetsTask.dependsOn copyTask
         project.tasks.withType(org.gradle.jvm.tasks.Jar.class).configureEach {
             it.destinationDirectory = jarTargetDir
-            doLast {
-                if(!it.didWork) return
-                writeVersion jarTargetDir
-            }
+            doLast { if(it.didWork) writeVersion jarTargetDir }
         }
     }
     def onlineJarDependency(String jarUrl, String jarProject, String dependency, String version, String suffix, String relativePath) {
@@ -238,10 +211,7 @@ class AssetTaskRegistrar {
             src String.format(jarUrl, jarProject, dependency, version, suffix)
             dest targetDir
             overwrite false
-            doLast {
-                if(!it.didWork) return
-                writeVersion targetDir
-            }
+            doLast { if(it.didWork) writeVersion targetDir }
         }
         mergeAssetsTask.dependsOn(downloadTask)
     }
