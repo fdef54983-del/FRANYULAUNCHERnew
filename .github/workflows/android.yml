@@ -49,59 +49,79 @@ jobs:
 
       - name: Build Debug .apk
         run: |
-          # Build the launcher
           gradle :app_pojavlauncher:assembleFullDebug
-          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
-          cp out/app-debug-full.apk out/FranyuLauncher.apk
+          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/FranyuLauncher.apk
 
       - name: Build Debug .apk (No runtime)
         run: |
           gradle :app_pojavlauncher:assembleNoruntimeDebug
-          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/app-debug-noruntime.apk
-          cp out/app-debug-noruntime.apk out/FranyuLauncher-noruntime.apk
+          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/FranyuLauncher-noruntime.apk
 
-      - name: Gen md5sums
+      - name: Verify APK archives before publishing
         run: |
-          md5sum out/app-debug-full.apk > out/app-debug-full.md5
-          md5sum out/app-debug-noruntime.apk > out/app-debug-noruntime.md5
+          set -e
+          test -s out/FranyuLauncher.apk
+          test -s out/FranyuLauncher-noruntime.apk
+          unzip -t out/FranyuLauncher.apk
+          unzip -t out/FranyuLauncher-noruntime.apk
+          apksigner verify --verbose out/FranyuLauncher.apk
+          apksigner verify --verbose out/FranyuLauncher-noruntime.apk
 
-      - name: Upload Debug APK
+      - name: Generate SHA-256 checksums
+        run: |
+          sha256sum out/FranyuLauncher.apk > out/FranyuLauncher.apk.sha256
+          sha256sum out/FranyuLauncher-noruntime.apk > out/FranyuLauncher-noruntime.apk.sha256
+
+      - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: FranyuLauncher-debug
-          path: out/FranyuLauncher.apk
+          path: |
+            out/FranyuLauncher.apk
+            out/FranyuLauncher.apk.sha256
           compression-level: 0
 
-      - name: Upload Debug APK (No runtime)
+      - name: Upload Debug APK artifact (No runtime)
         uses: actions/upload-artifact@v4
         with:
           name: FranyuLauncher-noruntime
-          path: out/FranyuLauncher-noruntime.apk
+          path: |
+            out/FranyuLauncher-noruntime.apk
+            out/FranyuLauncher-noruntime.apk.sha256
           compression-level: 0
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
+        if: hashFiles('out/app-gplay.aab') != ''
         with:
           name: app-release-aab
           path: out/app-gplay.aab
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release v1.1
         uses: softprops/action-gh-release@v2
         if: github.repository_owner == 'fdef54983-del'
-        continue-on-error: true
         with:
-          tag_name: "v1.0"
-          name: "FranyuLauncher v1.0"
+          tag_name: "v1.1"
+          name: "FranyuLauncher v1.1"
           body: |
-            ### 🎮 FranyuLauncher APK
-            Descarga directa para Android (Direct APK Download):
-            - 📥 **FranyuLauncher.apk** (Recomendado - Completo con Java Runtime)
-            - 📥 **FranyuLauncher-noruntime.apk** (Sin runtime)
+            ### FranyuLauncher APK
+            Descarga los APK directamente desde **Assets** de este release.
+
+            - **FranyuLauncher.apk** — Completo con Java Runtime
+            - **FranyuLauncher-noruntime.apk** — Sin runtime
+
+            ### Integridad
+            Los APK se verifican durante CI con `unzip -t` y `apksigner verify` antes de publicarse.
+            Los archivos `.sha256` permiten comprobar que la descarga no se corrompió.
+
+            **Importante:** no uses el ZIP de GitHub Actions para instalar la aplicación. Descarga el APK directamente desde los Assets de este release.
           draft: false
           prerelease: false
           files: |
             out/FranyuLauncher.apk
             out/FranyuLauncher-noruntime.apk
+            out/FranyuLauncher.apk.sha256
+            out/FranyuLauncher-noruntime.apk.sha256
 
       - name: Upload onto the Google Play testing track
         continue-on-error: true
