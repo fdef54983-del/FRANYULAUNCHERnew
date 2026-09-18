@@ -16,7 +16,7 @@ jobs:
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get LTW
         uses: dawidd6/action-download-artifact@v2
@@ -33,105 +33,84 @@ jobs:
           gradle-version: "8.14.3"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
       - name: Create out directory
-        run: mkdir out
+        run: mkdir -p out
 
-      - name: Build Publishing .aab
-        if: github.repository_owner == 'MojoLauncher' && github.ref_name == 'v3_openjdk'
+      - name: Build FranyuLauncher 1.2 AAB
         run: |
           gradle :app_pojavlauncher:bundleFullGplay
-          mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/app-gplay.aab
+          mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/FranyuLauncher-1.2.aab
 
-      - name: Build Debug .apk
+      - name: Build Debug APK
         run: |
           gradle :app_pojavlauncher:assembleFullDebug
-          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/FranyuLauncher.apk
+          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/FranyuLauncher-1.2.apk
 
-      - name: Build Debug .apk (No runtime)
+      - name: Build Debug APK (No runtime)
         run: |
           gradle :app_pojavlauncher:assembleNoruntimeDebug
-          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/FranyuLauncher-noruntime.apk
+          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/FranyuLauncher-1.2-noruntime.apk
 
-      - name: Verify APK archives before publishing
+      - name: Verify APK and AAB archives before publishing
         run: |
           set -e
-          test -s out/FranyuLauncher.apk
-          test -s out/FranyuLauncher-noruntime.apk
-          unzip -t out/FranyuLauncher.apk
-          unzip -t out/FranyuLauncher-noruntime.apk
+          test -s out/FranyuLauncher-1.2.apk
+          test -s out/FranyuLauncher-1.2-noruntime.apk
+          test -s out/FranyuLauncher-1.2.aab
+          unzip -t out/FranyuLauncher-1.2.apk
+          unzip -t out/FranyuLauncher-1.2-noruntime.apk
+          unzip -t out/FranyuLauncher-1.2.aab
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose out/FranyuLauncher.apk
-          "$APKSIGNER" verify --verbose out/FranyuLauncher-noruntime.apk
+          "$APKSIGNER" verify --verbose out/FranyuLauncher-1.2.apk
+          "$APKSIGNER" verify --verbose out/FranyuLauncher-1.2-noruntime.apk
 
       - name: Generate SHA-256 checksums
         run: |
-          sha256sum out/FranyuLauncher.apk > out/FranyuLauncher.apk.sha256
-          sha256sum out/FranyuLauncher-noruntime.apk > out/FranyuLauncher-noruntime.apk.sha256
+          sha256sum out/FranyuLauncher-1.2.apk > out/FranyuLauncher-1.2.apk.sha256
+          sha256sum out/FranyuLauncher-1.2-noruntime.apk > out/FranyuLauncher-1.2-noruntime.apk.sha256
+          sha256sum out/FranyuLauncher-1.2.aab > out/FranyuLauncher-1.2.aab.sha256
 
-      - name: Upload Debug APK artifact
+      - name: Upload FranyuLauncher 1.2 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: FranyuLauncher-debug
+          name: FranyuLauncher-1.2
           path: |
-            out/FranyuLauncher.apk
-            out/FranyuLauncher.apk.sha256
+            out/FranyuLauncher-1.2.apk
+            out/FranyuLauncher-1.2.apk.sha256
+            out/FranyuLauncher-1.2-noruntime.apk
+            out/FranyuLauncher-1.2-noruntime.apk.sha256
+            out/FranyuLauncher-1.2.aab
+            out/FranyuLauncher-1.2.aab.sha256
           compression-level: 0
 
-      - name: Upload Debug APK artifact (No runtime)
-        uses: actions/upload-artifact@v4
-        with:
-          name: FranyuLauncher-noruntime
-          path: |
-            out/FranyuLauncher-noruntime.apk
-            out/FranyuLauncher-noruntime.apk.sha256
-          compression-level: 0
-
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
-        if: hashFiles('out/app-gplay.aab') != ''
-        with:
-          name: app-release-aab
-          path: out/app-gplay.aab
-
-      - name: Create GitHub Release v1.1
+      - name: Create GitHub Release v1.2
         uses: softprops/action-gh-release@v2
-        if: github.repository_owner == 'fdef54983-del'
+        if: github.repository_owner == 'fdef54983-del' && github.ref_name == 'feat/standard_cursors'
         with:
-          tag_name: "v1.1"
-          name: "FranyuLauncher v1.1"
+          tag_name: "v1.2"
+          name: "FranyuLauncher v1.2"
           body: |
-            ### FranyuLauncher APK
-            Descarga los APK directamente desde **Assets** de este release.
+            ### FranyuLauncher v1.2
+            - Rebrand cleanup and FranyuLauncher crash reporting.
+            - Resilient downloads with concurrent workers, retries, exponential backoff and HTTP Range resume.
+            - SHA-256 checksums for published artifacts.
+            - AAB publication for ABI-aware Android delivery.
+            - Deferred non-critical runtime initialization and session version-list caching.
 
-            - **FranyuLauncher.apk** — Completo con Java Runtime
-            - **FranyuLauncher-noruntime.apk** — Sin runtime
-
-            ### Integridad
-            Los APK se verifican durante CI con `unzip -t` y `apksigner verify` antes de publicarse.
-            Los archivos `.sha256` permiten comprobar que la descarga no se corrompió.
-
-            **Importante:** no uses el ZIP de GitHub Actions para instalar la aplicación. Descarga el APK directamente desde los Assets de este release.
+            **APK:** direct installation artifact.
+            **AAB:** intended for Android app-store distribution; install the APK when sideloading.
           draft: false
           prerelease: false
           files: |
-            out/FranyuLauncher.apk
-            out/FranyuLauncher-noruntime.apk
-            out/FranyuLauncher.apk.sha256
-            out/FranyuLauncher-noruntime.apk.sha256
-
-      - name: Upload onto the Google Play testing track
-        continue-on-error: true
-        if: github.repository_owner == 'MojoLauncher' && github.ref_name == 'v3_openjdk'
-        uses: r0adkll/upload-google-play@v1.1.2
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.SERVICE_JSON }}
-          packageName: git.artdeell.mojo
-          releaseFiles: out/app-gplay.aab
-          track: internal
-          inAppUpdatePriority: 5
+            out/FranyuLauncher-1.2.apk
+            out/FranyuLauncher-1.2.apk.sha256
+            out/FranyuLauncher-1.2-noruntime.apk
+            out/FranyuLauncher-1.2-noruntime.apk.sha256
+            out/FranyuLauncher-1.2.aab
+            out/FranyuLauncher-1.2.aab.sha256
