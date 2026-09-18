@@ -22,8 +22,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.Callable;
 
-import git.artdeell.mojo.BuildConfig;
-
 public class ElyByBackgroundLogin implements BackgroundLogin {
     public static final BackgroundLogin.Creator CREATOR = ElyByBackgroundLogin::new;
 
@@ -85,13 +83,12 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
     }
 
     private void acquireTokens(boolean isRefresh, String code) throws IOException {
-        if(BuildConfig.ELYBY_CLIENT_ID.isEmpty() || BuildConfig.ELYBY_CLIENT_SECRET.isEmpty()) {
-            throw new IOException("Ely.by OAuth is not configured for FranyuLauncher. Register FranyuLauncher and configure ELYBY_CLIENT_ID and ELYBY_CLIENT_SECRET in the build environment.");
-        }
         URL url = new URL(authTokenUrl);
+        Log.i("MicrosoftLogin", "isRefresh=" + isRefresh + ", authCode= " + code);
+
         String formData = CommonLoginUtils.convertToFormData(
-                "client_id", BuildConfig.ELYBY_CLIENT_ID,
-                "client_secret", BuildConfig.ELYBY_CLIENT_SECRET,
+                "client_id", "mojolauncher2",
+                "client_secret", "o14Zb2Zzj0_k6o4kN0t1mIEhoQxeayn8hYi5VSX2q3NXrdQm5T2Q6wqsCfpv1vhu",
                 "redirect_uri", "internalredirect://complete",
                 isRefresh ? "refresh_token" : "code", code,
                 "grant_type", isRefresh ? "refresh_token" : "authorization_code"
