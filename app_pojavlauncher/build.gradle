@@ -34,11 +34,6 @@ def getCFApiKey = {
     return "DUMMY"
 }
 
-def getEnvOrEmpty = { String name ->
-    String value = System.getenv(name)
-    return value == null ? "" : value.replace("\\", "\\\\").replace('"', '\\"')
-}
-
 configurations {
     instrumentedClasspath {
         canBeConsumed = false
@@ -75,8 +70,6 @@ android {
         versionName getVersionName()
         multiDexEnabled true
         resValue 'string', 'curseforge_api_key', getCFApiKey()
-        buildConfigField 'String', 'ELYBY_CLIENT_ID', '"' + getEnvOrEmpty('ELYBY_CLIENT_ID') + '"'
-        buildConfigField 'String', 'ELYBY_CLIENT_SECRET', '"' + getEnvOrEmpty('ELYBY_CLIENT_SECRET') + '"'
     }
 
     flavorDimensions = ["runtime"]
@@ -111,10 +104,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             resValue 'string', 'storageProviderAuthorities', 'com.franyu.launcher.scoped.gamefolder'
             resValue 'string', 'application_package', 'com.franyu.launcher'
+            signingConfig signingConfigs.customDebug
         }
         gplay {
             initWith release
-            signingConfig signingConfigs.googlePlayBuild
+            signingConfig signingConfigs.customDebug
         }
     }
 
