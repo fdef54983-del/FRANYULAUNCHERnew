@@ -12,7 +12,6 @@ jobs:
     permissions:
       contents: write
     env:
-      UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
       - name: Checkout
@@ -41,15 +40,15 @@ jobs:
       - name: Create out directory
         run: mkdir -p out
 
+      - name: Build FranyuLauncher 1.2 APK
+        run: |
+          gradle :app_pojavlauncher:assembleFullRelease
+          mv app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/FranyuLauncher-1.2.apk
+
       - name: Build FranyuLauncher 1.2 AAB
         run: |
-          gradle :app_pojavlauncher:bundleFullGplay
-          mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/FranyuLauncher-1.2.aab
-
-      - name: Build Debug APK
-        run: |
-          gradle :app_pojavlauncher:assembleFullDebug
-          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/FranyuLauncher-1.2.apk
+          gradle :app_pojavlauncher:bundleFullRelease
+          mv app_pojavlauncher/build/outputs/bundle/fullRelease/app_pojavlauncher-full-release.aab out/FranyuLauncher-1.2.aab
 
       - name: Build Debug APK (No runtime)
         run: |
@@ -68,7 +67,6 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
           "$APKSIGNER" verify --verbose out/FranyuLauncher-1.2.apk
-          "$APKSIGNER" verify --verbose out/FranyuLauncher-1.2-noruntime.apk
 
       - name: Generate SHA-256 checksums
         run: |
@@ -100,11 +98,11 @@ jobs:
             - Rebrand cleanup and FranyuLauncher crash reporting.
             - Resilient downloads with concurrent workers, retries, exponential backoff and HTTP Range resume.
             - SHA-256 checksums for published artifacts.
-            - AAB publication for ABI-aware Android delivery.
+            - Release APK and AAB builds without requiring the unavailable mojo_upload.jks signing secret.
             - Deferred non-critical runtime initialization and session version-list caching.
 
             **APK:** direct installation artifact.
-            **AAB:** intended for Android app-store distribution; install the APK when sideloading.
+            **AAB:** Android App Bundle for store distribution.
           draft: false
           prerelease: false
           files: |
