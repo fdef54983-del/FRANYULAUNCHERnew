@@ -1,9 +1,15 @@
 package net.kdt.pojavlaunch.downloader;
 
+import android.app.Application;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.util.Log;
 
 import com.kdt.mcgui.ProgressLayout;
 
+import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.tasks.SpeedCalculator;
 import net.kdt.pojavlaunch.utils.DownloadUtils;
 
@@ -30,6 +36,7 @@ import git.artdeell.mojo.R;
 
 public class Downloader {
     private static final double ONE_MEGABYTE = (1024d * 1024d);
+    private static final int MAX_DOWNLOAD_THREADS = 8;
     private static final ThreadLocal<byte[]> sThreadLocalBuffer = new ThreadLocal<>();
     private final String mProgressKey;
     private final AtomicReference<IOException> mThreadException = new AtomicReference<>();
@@ -48,7 +55,7 @@ public class Downloader {
     protected void runDownloads(ArrayList<? extends TaskMetadata> downloads) throws IOException, InterruptedException {
         try {
             insertMetadata(downloads);
-        }catch (IOException e) {
+        } catch (IOException e) {
             Log.w("Downloader", "Failed to complete the task metadata!", e);
             disableSizeCounter();
         }
@@ -59,8 +66,10 @@ public class Downloader {
         mThreadException.set(null);
         mDownloadedFileCounter.set(0);
         mDownloadedSizeCounter.set(0);
-        mDownloadService = Executors.newFixedThreadPool(3);
-        mVerifyService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), r -> {
+        int processors = Math.max(1, Runtime.getRuntime().availableProcessors());
+        int downloadThreads = Math.max(3, Math.min(MAX_DOWNLOAD_THREADS, processors * 2));
+        mDownloadService = Executors.newFixedThreadPool(downloadThreads);
+        mVerifyService = Executors.newFixedThreadPool(Math.max(1, processors), r -> {
             Thread thread = new Thread(r);
             thread.setPriority(10);
             thread.setName("verify thread");
@@ -83,8 +92,7 @@ public class Downloader {
         }
         mDownloadService.shutdown();
         mVerifyService.shutdown();
-        if(!mDownloadService.awaitTermination(100, TimeUnit.MILLISECONDS) ||
-                !mVerifyService.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+        if(!mDownloadService.awaitTermination(100, TimeUnit.MILLISECONDS) || !mVerifyService.awaitTermination(100, TimeUnit.MILLISECONDS)) {
             throw new RuntimeException("BUG! The file counter is wrong. Maybe. Send this to artDev.");
         }
     }
@@ -115,18 +123,14 @@ public class Downloader {
 
     private void reportCountProgress(int resource, int total) {
         int downloadedCount = mDownloadedFileCounter.get();
-        int progress = (int) ((downloadedCount / (float)total) * 100f);
-        ProgressLayout.setProgress(mProgressKey, progress, resource,
-                downloadedCount, total, getSpeed()
-        );
+        int progress = total <= 0 ? 100 : (int) ((downloadedCount / (float)total) * 100f);
+        ProgressLayout.setProgress(mProgressKey, progress, resource, downloadedCount, total, getSpeed());
     }
 
     private void reportSizeProgress(double totalMegabytes) {
         double downloadedMegabytes = mDownloadedSizeCounter.get() / ONE_MEGABYTE;
-        int progress = (int) (downloadedMegabytes / totalMegabytes * 100d);
-        ProgressLayout.setProgress(mProgressKey, progress, R.string.newerdl_downloading_files_size,
-                downloadedMegabytes, totalMegabytes, getSpeed()
-        );
+        int progress = totalMegabytes <= 0 ? 100 : (int) (downloadedMegabytes / totalMegabytes * 100d);
+        ProgressLayout.setProgress(mProgressKey, progress, R.string.newerdl_downloading_files_size, downloadedMegabytes, totalMegabytes, getSpeed());
     }
 
     protected void taskException(IOException e) {
@@ -153,6 +157,36 @@ public class Downloader {
         mDownloadedSizeCounter.getAndAdd(bytes);
     }
 
+    protected boolean isNetworkAvailable() {
+        Application application = ContextExecutor.getApplication();
+        if(application == null) return true;
+        ConnectivityManager manager = (ConnectivityManager) application.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if(manager == null) return true;
+        Network network = manager.getActiveNetwork();
+        if(network == null) return false;
+        NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+        return capabilities != null && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    }
+
+    protected void waitForNetwork() throws InterruptedException {
+        while(!isNetworkAvailable()) {
+            ProgressLayout.setProgress(mProgressKey, 0, R.string.dl_no_internet);
+            Thread.sleep(2000);
+        }
+    }
+
+    protected void waitForNetworkRecovery() throws InterruptedException {
+        while(!isNetworkAvailable()) {
+            ProgressLayout.setProgress(mProgressKey, 0, R.string.dl_paused_offline);
+            Thread.sleep(2000);
+        }
+    }
+
+    protected void sleepBackoff(int attempt) throws InterruptedException {
+        long delay = 1000L << Math.min(4, Math.max(0, attempt));
+        Thread.sleep(delay);
+    }
+
     private void copy(InputStream inputStream, OutputStream outputStream, BytesCopiedListener listener) throws IOException {
         byte[] buffer = getBuffer();
         int readLen;
@@ -165,7 +199,8 @@ public class Downloader {
 
     private static HttpURLConnection openConnection(URL url) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setReadTimeout(10000);
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(15000);
         connection.setRequestProperty("User-Agent", DownloadUtils.USER_AGENT);
         connection.setDoInput(true);
         connection.setDoOutput(false);
@@ -173,8 +208,9 @@ public class Downloader {
     }
 
     protected void downloadToStream(HttpURLConnection connection, OutputStream outputStream, BytesCopiedListener listener) throws IOException {
-        InputStream inputStream = connection.getInputStream();
-        copy(inputStream, outputStream, listener);
+        try(InputStream inputStream = connection.getInputStream()) {
+            copy(inputStream, outputStream, listener);
+        }
     }
 
     protected String downloadString(URL url) throws IOException {
@@ -184,7 +220,7 @@ public class Downloader {
         try(ByteArrayOutputStream outputStream = new ByteArrayOutputStream(length)) {
             downloadToStream(connection, outputStream, null);
             return new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
-        }finally {
+        } finally {
             connection.disconnect();
         }
     }
@@ -193,39 +229,38 @@ public class Downloader {
         HttpURLConnection connection = openConnection(url);
         try(FileOutputStream outputStream = new FileOutputStream(file)) {
             downloadToStream(connection, outputStream, listener);
-        }finally {
+        } finally {
             connection.disconnect();
         }
     }
 
     protected boolean tryContinueDownload(File file, long wantedLength, URL url, BytesCopiedListener listener) throws IOException {
+        long existing = file.length();
+        if(existing <= 0 || (wantedLength > 0 && existing >= wantedLength)) return false;
         HttpURLConnection connection = openConnection(url);
-        String range = String.format(Locale.ENGLISH,"bytes %d-%d/%d", file.length(), wantedLength-1, wantedLength);
-        connection.setRequestProperty("Content-Range", range);
+        connection.setRequestProperty("Range", String.format(Locale.ENGLISH, "bytes=%d-", existing));
         try {
             connection.connect();
             int responseCode = connection.getResponseCode();
-            if(responseCode != 206) {
-                return false;
-            }
+            if(responseCode != HttpURLConnection.HTTP_PARTIAL) return false;
             try(FileOutputStream outputStream = new FileOutputStream(file, true)) {
                 downloadToStream(connection, outputStream, listener);
-                return true;
+                return wantedLength <= 0 || file.length() == wantedLength;
             }
-        }finally {
+        } finally {
             connection.disconnect();
         }
     }
 
     protected long getFileContentLength(URL url) throws IOException {
         HttpURLConnection connection = openConnection(url);
-        connection.setRequestMethod("HEAD");
-        connection.connect();
-        int response = connection.getResponseCode();
-        if(response >= 400) {
-            return -1;
-        }else {
-            return connection.getContentLength();
+        try {
+            connection.setRequestMethod("HEAD");
+            connection.connect();
+            int response = connection.getResponseCode();
+            return response >= 400 ? -1 : connection.getContentLength();
+        } finally {
+            connection.disconnect();
         }
     }
 
