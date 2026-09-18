@@ -5,7 +5,6 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.util.Log;
 
 import com.kdt.mcgui.ProgressLayout;
 
@@ -35,7 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import git.artdeell.mojo.R;
 
 public class Downloader {
-    private static final double ONE_MEGABYTE = (1024d * 1024d);
+    private static final double ONE_MEGABYTE = 1024d * 1024d;
     private static final int MAX_DOWNLOAD_THREADS = 8;
     private static final ThreadLocal<byte[]> sThreadLocalBuffer = new ThreadLocal<>();
     private final String mProgressKey;
@@ -48,9 +47,7 @@ public class Downloader {
     private ExecutorService mDownloadService;
     private ExecutorService mVerifyService;
 
-    public Downloader(String mProgressKey) {
-        this.mProgressKey = mProgressKey;
-    }
+    public Downloader(String mProgressKey) { this.mProgressKey = mProgressKey; }
 
     protected void runDownloads(ArrayList<? extends TaskMetadata> downloads) throws IOException, InterruptedException {
         insertMetadata(downloads);
@@ -91,18 +88,15 @@ public class Downloader {
     private void insertMetadata(ArrayList<? extends TaskMetadata> metadata) throws IOException, InterruptedException {
         mThreadException.set(null);
         ArrayList<TaskMetadata> reducedList = new ArrayList<>();
-        for(TaskMetadata element : metadata) {
-            if(CompleteMetadataTask.shouldCompleteMetadata(element)) reducedList.add(element);
-        }
+        for(TaskMetadata element : metadata) if(CompleteMetadataTask.shouldCompleteMetadata(element)) reducedList.add(element);
         if(reducedList.isEmpty()) return;
-        try (ExecutorService executorService = Executors.newFixedThreadPool(Math.min(4, Math.max(1, Runtime.getRuntime().availableProcessors())))) {
-            for(TaskMetadata element : reducedList) executorService.submit(new CompleteMetadataTask(element, this));
-            executorService.shutdown();
-            while(!executorService.awaitTermination(33, TimeUnit.MILLISECONDS)) {
-                IOException exception = mThreadException.get();
-                if(exception != null) throw exception;
-                reportCountProgress(R.string.newerdl_inserting_metadata_count, reducedList.size());
-            }
+        ExecutorService executorService = Executors.newFixedThreadPool(Math.min(4, Math.max(1, Runtime.getRuntime().availableProcessors())));
+        for(TaskMetadata element : reducedList) executorService.submit(new CompleteMetadataTask(element, this));
+        executorService.shutdown();
+        while(!executorService.awaitTermination(33, TimeUnit.MILLISECONDS)) {
+            IOException exception = mThreadException.get();
+            if(exception != null) throw exception;
+            reportCountProgress(R.string.newerdl_inserting_metadata_count, reducedList.size());
         }
     }
 
@@ -153,8 +147,7 @@ public class Downloader {
     }
 
     protected void sleepBackoff(int attempt) throws InterruptedException {
-        long delay = 1000L << Math.min(4, Math.max(0, attempt));
-        Thread.sleep(delay);
+        Thread.sleep(1000L << Math.min(4, Math.max(0, attempt)));
     }
 
     private void copy(InputStream inputStream, OutputStream outputStream, BytesCopiedListener listener) throws IOException {
@@ -208,6 +201,16 @@ public class Downloader {
                 downloadToStream(connection, outputStream, listener);
                 return wantedLength <= 0 || file.length() == wantedLength;
             }
+        } finally { connection.disconnect(); }
+    }
+
+    protected long getFileContentLength(URL url) throws IOException {
+        HttpURLConnection connection = openConnection(url);
+        try {
+            connection.setRequestMethod("HEAD");
+            connection.connect();
+            int response = connection.getResponseCode();
+            return response >= 400 ? -1 : connection.getContentLengthLong();
         } finally { connection.disconnect(); }
     }
 
