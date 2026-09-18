@@ -64,8 +64,10 @@ jobs:
           test -s out/FranyuLauncher-noruntime.apk
           unzip -t out/FranyuLauncher.apk
           unzip -t out/FranyuLauncher-noruntime.apk
-          apksigner verify --verbose out/FranyuLauncher.apk
-          apksigner verify --verbose out/FranyuLauncher-noruntime.apk
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose out/FranyuLauncher.apk
+          "$APKSIGNER" verify --verbose out/FranyuLauncher-noruntime.apk
 
       - name: Generate SHA-256 checksums
         run: |
