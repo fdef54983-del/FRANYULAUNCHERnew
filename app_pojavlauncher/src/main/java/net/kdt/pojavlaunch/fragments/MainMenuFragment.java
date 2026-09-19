@@ -56,6 +56,7 @@ public class MainMenuFragment extends Fragment {
     private TextView mUpdateVersion;
     private TextView mUpdateBody;
     private UpdateChecker mUpdateChecker;
+    private UpdateChecker.Update mLatestUpdate;
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
             registerForActivityResult(new OpenDocumentWithExtension("jar"), (data)->{
@@ -108,9 +109,9 @@ public class MainMenuFragment extends Fragment {
 
         Button updateInstall = view.findViewById(R.id.update_install_button);
         Button updateSkip = view.findViewById(R.id.update_skip_button);
-        updateInstall.setOnClickListener(v -> mUpdateChecker.installLatest(requireActivity()));
+        updateInstall.setOnClickListener(v -> mUpdateChecker.install(mLatestUpdate, requireActivity()));
         updateSkip.setOnClickListener(v -> {
-            mUpdateChecker.skipLatest();
+            if (mLatestUpdate != null) mUpdateChecker.skipVersion(mLatestUpdate.version);
             mUpdateCard.setVisibility(View.GONE);
         });
 
@@ -218,6 +219,7 @@ public class MainMenuFragment extends Fragment {
             mUpdateBody.setText(body);
             mUpdateBody.setMaxLines(6);
             mUpdateBody.setEllipsize(TextUtils.TruncateAt.END);
+            mLatestUpdate = update;
             mUpdateCard.setVisibility(View.VISIBLE);
         });
     }
