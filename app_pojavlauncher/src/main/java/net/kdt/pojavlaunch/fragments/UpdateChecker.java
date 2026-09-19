@@ -26,12 +26,13 @@ import java.util.concurrent.Executors;
 import git.artdeell.mojo.BuildConfig;
 
 public class UpdateChecker implements AutoCloseable {
-    private static final long CHECK_INTERVAL = 6L * 60L * 60L * 1000L;
+    private static final long CHECK_INTERVAL = 60L * 60L * 1000L;
     private static final String RELEASES_URL =
             "https://api.github.com/repos/fdef54983-del/FRANYULAUNCHERnew/releases/latest";
     private static final String PREFS = "franyu_updates";
     private static final String KEY_CHECK = "last_check";
     private static final String KEY_SKIPPED = "skipped_version";
+    private static final String KEY_PENDING_APK = "pending_apk";
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -55,7 +56,8 @@ public class UpdateChecker implements AutoCloseable {
     }
 
     public void check(Callback callback) {
-        long last = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_CHECK, 0);
+        long last = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getLong(KEY_CHECK, 0);
         if (System.currentTimeMillis() - last < CHECK_INTERVAL) return;
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putLong(KEY_CHECK, System.currentTimeMillis()).apply();
@@ -74,15 +76,17 @@ public class UpdateChecker implements AutoCloseable {
                     try (InputStream in = connection.getInputStream()) {
                         byte[] buffer = new byte[4096];
                         int n;
-                        while ((n = in.read(buffer)) != -1) json.append(new String(buffer, 0, n, "UTF-8"));
+                        while ((n = in.read(buffer)) != -1) {
+                            json.append(new String(buffer, 0, n, "UTF-8"));
+                        }
                     }
                     JsonObject release = new JsonParser().parse(json.toString()).getAsJsonObject();
                     String tag = release.has("tag_name") ? release.get("tag_name").getAsString() : "";
                     String version = tag.startsWith("v") ? tag.substring(1) : tag;
                     String installed = BuildConfig.VERSION_NAME == null ? "" : BuildConfig.VERSION_NAME;
-                    if (isNewer(version, installed) &&
-                            !version.equals(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                                    .getString(KEY_SKIPPED, ""))) {
+                    if (isNewer(version, installed)
+                            && !version.equals(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                            .getString(KEY_SKIPPED, ""))) {
                         String apk = null;
                         if (release.has("assets")) {
                             JsonArray assets = release.getAsJsonArray("assets");
@@ -95,8 +99,10 @@ public class UpdateChecker implements AutoCloseable {
                                 }
                             }
                         }
-                        if (apk != null) update = new Update(version,
-                                release.has("body") ? release.get("body").getAsString() : "", apk);
+                        if (apk != null) {
+                            update = new Update(version,
+                                    release.has("body") ? release.get("body").getAsString() : "", apk);
+                        }
                     }
                 }
             } catch (Exception ignored) {
@@ -109,13 +115,14 @@ public class UpdateChecker implements AutoCloseable {
     }
 
     private static boolean isNewer(String remote, String installed) {
-        int[] r = numbers(remote), i = numbers(installed);
+        int[] r = numbers(remote);
+        int[] i = numbers(installed);
         for (int n = 0; n < Math.max(r.length, i.length); n++) {
             int rv = n < r.length ? r[n] : 0;
             int iv = n < i.length ? i[n] : 0;
             if (rv != iv) return rv > iv;
         }
-        return !remote.equals(installed) && !remote.isEmpty();
+        return false;
     }
 
     private static int[] numbers(String value) {
@@ -124,53 +131,98 @@ public class UpdateChecker implements AutoCloseable {
         String[] parts = clean.split("\\.");
         int[] result = new int[parts.length];
         for (int n = 0; n < parts.length; n++) {
-            try { result[n] = Integer.parseInt(parts[n]); } catch (Exception e) { result[n] = 0; }
+            try {
+                result[n] = Integer.parseInt(parts[n]);
+            } catch (Exception e) {
+                result[n] = 0;
+            }
         }
         return result;
     }
 
-    public void skipLatest() {
-        // The card supplies the current version through the view; callers use skipVersion below.
-    }
-
     public void skipVersion(String version) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_SKIPPED, version).apply();
-    }
-
-    public void installLatest(Activity activity) {
-        executor.execute(() -> {
-            File apk = new File(context.getCacheDir(), "franyulauncher-update.apk");
-            // The URL is obtained by check() and held only in the callback in the current UI.
-            // This method is replaced by install(Update, Activity) for the concrete release.
-        });
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(KEY_SKIPPED, version).apply();
     }
 
     public void install(Update update, Activity activity) {
+        if (update == null || activity == null) return;
         executor.execute(() -> {
+            File apk = new File(context.getCacheDir(), "franyulauncher-" + update.version + ".apk");
             try {
-                File apk = new File(context.getCacheDir(), "franyulauncher-" + update.version + ".apk");
-                HttpURLConnection c = (HttpURLConnection) new URL(update.apkUrl).openConnection();
-                c.setConnectTimeout(10000);
-                c.setReadTimeout(60000);
-                c.setRequestProperty("User-Agent", "FranyuLauncher");
-                try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(apk)) {
-                    byte[] buffer = new byte[8192]; int n;
-                    while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
-                } finally { c.disconnect(); }
-                Uri uri = FileProvider.getUriForFile(context,
-                        context.getPackageName() + ".updateprovider", apk);
-                Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-                        !activity.getPackageManager().canRequestPackageInstalls()) {
-                    intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                            Uri.parse("package:" + context.getPackageName()));
+                if (!apk.isFile() || apk.length() == 0) download(update.apkUrl, apk);
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                        .putString(KEY_PENDING_APK, apk.getAbsolutePath()).apply();
+                main.post(() -> launchInstaller(activity, apk));
+            } catch (Exception e) {
+                if (!closed) {
+                    main.post(() -> android.widget.Toast.makeText(activity,
+                            "No se pudo descargar la actualización. Comprueba tu conexión e inténtalo de nuevo.",
+                            android.widget.Toast.LENGTH_LONG).show());
                 }
-                Intent finalIntent = intent;
-                main.post(() -> activity.startActivity(finalIntent));
-            } catch (Exception ignored) {
             }
         });
+    }
+
+    private void download(String url, File destination) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(60000);
+        c.setRequestProperty("User-Agent", "FranyuLauncher");
+        c.setInstanceFollowRedirects(true);
+        if (c.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            throw new java.io.IOException("HTTP " + c.getResponseCode());
+        }
+        try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(destination, false)) {
+            byte[] buffer = new byte[32768];
+            int n;
+            while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    public void resumePendingInstall(Activity activity) {
+        if (activity == null) return;
+        String path = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_PENDING_APK, "");
+        if (path == null || path.isEmpty()) return;
+        File apk = new File(path);
+        if (!apk.isFile() || apk.length() == 0) {
+            clearPendingInstall();
+            return;
+        }
+        main.post(() -> launchInstaller(activity, apk));
+    }
+
+    private void launchInstaller(Activity activity, File apk) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && !activity.getPackageManager().canRequestPackageInstalls()) {
+            Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:" + context.getPackageName()));
+            settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(settings);
+            return;
+        }
+        try {
+            Uri uri = FileProvider.getUriForFile(context,
+                    context.getPackageName() + ".updateprovider", apk);
+            Intent intent = new Intent(Intent.ACTION_INSTALL_PACKAGE)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(intent);
+            clearPendingInstall();
+        } catch (Exception e) {
+            android.widget.Toast.makeText(activity,
+                    "No se pudo abrir el instalador del sistema.",
+                    android.widget.Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void clearPendingInstall() {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove(KEY_PENDING_APK).apply();
     }
 
     @Override public void close() {
