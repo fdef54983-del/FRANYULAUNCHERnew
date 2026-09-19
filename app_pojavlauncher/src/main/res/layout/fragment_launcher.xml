@@ -28,7 +28,6 @@
             android:background="@drawable/rail_item_bg"
             android:src="@drawable/ic_px_home"
             android:tint="@color/emerald_accent"
-            android:selected="true"
             android:contentDescription="Inicio"/>
 
         <ImageButton
