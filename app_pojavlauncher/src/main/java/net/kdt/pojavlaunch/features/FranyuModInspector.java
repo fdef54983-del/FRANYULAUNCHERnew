@@ -80,17 +80,17 @@ public final class FranyuModInspector {
                 }
 
                 Matcher jsonId = Pattern.compile(
-                        "\\"id\\"\\s*:\\s*\\"([^\\"]+)\\"")
+                        "\"id\"\\s*:\\s*\"([^\"]+)\"")
                         .matcher(content);
                 if (jsonId.find()) return jsonId.group(1).toLowerCase();
 
                 Matcher tomlId = Pattern.compile(
-                        "modId\\s*=\\s*\\"([^\\"]+)\\"")
+                        "modId\\s*=\\s*\"([^\"]+)\"")
                         .matcher(content);
                 if (tomlId.find()) return tomlId.group(1).toLowerCase();
 
                 Matcher legacyId = Pattern.compile(
-                        "\\"modid\\"\\s*:\\s*\\"([^\\"]+)\\"")
+                        "\"modid\"\\s*:\\s*\"([^\"]+)\"")
                         .matcher(content);
                 if (legacyId.find()) return legacyId.group(1).toLowerCase();
             }
