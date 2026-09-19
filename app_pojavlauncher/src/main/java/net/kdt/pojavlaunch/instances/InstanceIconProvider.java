@@ -33,9 +33,12 @@ public class InstanceIconProvider {
     public static @NonNull Drawable fetchIcon(Resources resources, @NonNull Instance instance) {
         int identityHashCode = System.identityHashCode(instance);
         Drawable cachedIcon = sIconCache.get(identityHashCode);
-        if(cachedIcon != null) return cachedIcon;
+        if (cachedIcon != null) {
+            cachedIcon.clearColorFilter();
+            return cachedIcon;
+        }
         Drawable instanceIcon = fetchInstanceFileIcon(resources, identityHashCode, instance.getInstanceIconLocation());
-        if(instanceIcon != null) return instanceIcon;
+        if (instanceIcon != null) return instanceIcon;
         return fetchStaticIcon(resources, identityHashCode, instance.icon);
     }
 
@@ -44,43 +47,48 @@ public class InstanceIconProvider {
     }
 
     private static Drawable fetchInstanceFileIcon(Resources resources, int identityHash, File iconLocation) {
-        if(!iconLocation.isFile() || !iconLocation.canRead()) return null;
+        if (!iconLocation.isFile() || !iconLocation.canRead()) return null;
         Bitmap iconBitmap = BitmapFactory.decodeFile(iconLocation.getAbsolutePath());
-        if(iconBitmap == null) return null;
+        if (iconBitmap == null) return null;
         Drawable iconDrawable = new BitmapDrawable(resources, iconBitmap);
+        iconDrawable.clearColorFilter();
         sIconCache.put(identityHash, iconDrawable);
         return iconDrawable;
     }
 
     private static Drawable fetchStaticIcon(Resources resources, int identityHash, String icon) {
         Drawable staticIcon = sStaticIconCache.get(icon);
-        if(staticIcon == null) {
-            if(icon != null) staticIcon = getStaticIcon(resources, icon);
-            if(staticIcon == null) staticIcon = fetchFallbackIcon(resources);
+        if (staticIcon == null) {
+            if (icon != null) staticIcon = getStaticIcon(resources, icon);
+            if (staticIcon == null) staticIcon = fetchFallbackIcon(resources);
             sStaticIconCache.put(icon, staticIcon);
         }
+        staticIcon.clearColorFilter();
         sIconCache.put(identityHash, staticIcon);
         return staticIcon;
     }
 
     private static @NonNull Drawable fetchFallbackIcon(Resources resources) {
         Drawable fallbackIcon = sStaticIconCache.get(FALLBACK_ICON_NAME);
-        if(fallbackIcon == null) {
+        if (fallbackIcon == null) {
             fallbackIcon = Objects.requireNonNull(getStaticIcon(resources, FALLBACK_ICON_NAME));
             sStaticIconCache.put(FALLBACK_ICON_NAME, fallbackIcon);
         }
+        fallbackIcon.clearColorFilter();
         return fallbackIcon;
     }
 
     private static Drawable getStaticIcon(Resources resources, @NonNull String icon) {
         int staticIconResource = getStaticIconResource(icon);
-        if(staticIconResource == -1) return null;
-        return ResourcesCompat.getDrawable(resources, staticIconResource, null);
+        if (staticIconResource == -1) return null;
+        Drawable drawable = ResourcesCompat.getDrawable(resources, staticIconResource, null);
+        if (drawable != null) drawable.clearColorFilter();
+        return drawable;
     }
 
     private static int getStaticIconResource(String icon) {
         Integer iconResource = sStaticIcons.get(icon);
-        if(iconResource == null) return -1;
+        if (iconResource == null) return -1;
         return iconResource;
     }
 
