@@ -15,6 +15,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -330,9 +331,4 @@ public class MainMenuFragment extends Fragment {
         }
     }
 
-    @Override
-    public void onDestroyView() {
-        if (mUpdateChecker != null) mUpdateChecker.close();
-        super.onDestroyView();
-    }
 }
