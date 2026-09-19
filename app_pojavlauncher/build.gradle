@@ -11,12 +11,42 @@ def getVersionName = { def currentBranch = grgit.branch.current(); def latestCom
 def getCFApiKey = { String key=System.getenv("CURSEFORGE_API_KEY"); if(key!=null)return key; File f=new File("./curseforge_key.txt"); if(f.canRead()&&f.isFile())return f.text; logger.warn('BUILD: You have no CurseForge key, the curseforge api will get disabled !'); return "DUMMY" }
 configurations { instrumentedClasspath { canBeConsumed=false; canBeResolved=true } }
 android {
- namespace 'git.artdeell.mojo'; compileSdk=36; lintOptions{abortOnError false}
- signingConfigs { customDebug{storeFile file("debug.keystore");storePassword "android";keyAlias "androiddebugkey";keyPassword "android"} googlePlayBuild{storeFile file("mojo_upload.jks");storePassword System.getenv("UPLOAD_KEYSTORE_PASSWORD");keyAlias "key0";keyPassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")} }
+ namespace 'git.artdeell.mojo'
+ compileSdk=36
+ lintOptions{abortOnError false}
+ signingConfigs {
+  customDebug {
+   storeFile file("debug.keystore")
+   storePassword "android"
+   keyAlias "androiddebugkey"
+   keyPassword "android"
+  }
+  googlePlayBuild {
+   storeFile file("mojo_upload.jks")
+   storePassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")
+   keyAlias "key0"
+   keyPassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")
+  }
+ }
  defaultConfig{applicationId "com.franyu.launcher";minSdkVersion 21;targetSdkVersion 35;versionCode getDateSeconds();versionName getVersionName();multiDexEnabled true;resValue 'string','curseforge_api_key',getCFApiKey()}
- flavorDimensions=["runtime"]; productFlavors{full{dimension "runtime"};noruntime{dimension "runtime";versionNameSuffix "-noruntime"}}
- buildTypes{debug{minifyEnabled false;shrinkResources false;proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),'proguard-rules.pro';signingConfig signingConfigs.customDebug;resValue 'string','application_package','com.franyu.launcher';resValue 'string','storageProviderAuthorities','com.franyu.launcher.scoped.gamefolder'} proguard{initWith debug;minifyEnabled true;shrinkResources true} proguardNoDebug{initWith proguard;debuggable false} release{minifyEnabled false;proguardFiles getDefaultProguardFile('proguard-android.txt'),'proguard-rules.pro';resValue 'string','storageProviderAuthorities','com.franyu.launcher.scoped.gamefolder';resValue 'string','application_package','com.franyu.launcher';signingConfig signingConfigs.customDebug} gplay{initWith release;signingConfig signingConfigs.customDebug}}
- ndkVersion="28.2.13676358"; externalNativeBuild{ndkBuild{path file('src/main/jni/Android.mk')}}; compileOptions{sourceCompatibility JavaVersion.VERSION_1_8;targetCompatibility JavaVersion.VERSION_1_8}; bundle{language{enableSplit=false}}; packagingOptions{jniLibs{useLegacyPackaging=true};pickFirst '**/libbytehook.so'}; buildFeatures{prefab true;buildConfig true}
+ flavorDimensions=["runtime"]
+ productFlavors{
+  full{dimension "runtime"}
+  noruntime{dimension "runtime";versionNameSuffix "-noruntime"}
+ }
+ buildTypes{
+  debug{minifyEnabled false;shrinkResources false;proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),'proguard-rules.pro';signingConfig signingConfigs.customDebug;resValue 'string','application_package','com.franyu.launcher';resValue 'string','storageProviderAuthorities','com.franyu.launcher.scoped.gamefolder'}
+  proguard{initWith debug;minifyEnabled true;shrinkResources true}
+  proguardNoDebug{initWith proguard;debuggable false}
+  release{minifyEnabled false;proguardFiles getDefaultProguardFile('proguard-android.txt'),'proguard-rules.pro';resValue 'string','storageProviderAuthorities','com.franyu.launcher.scoped.gamefolder';resValue 'string','application_package','com.franyu.launcher';signingConfig signingConfigs.customDebug}
+  gplay{initWith release;signingConfig signingConfigs.customDebug}
+ }
+ ndkVersion="28.2.13676358"
+ externalNativeBuild{ndkBuild{path file('src/main/jni/Android.mk')}}
+ compileOptions{sourceCompatibility JavaVersion.VERSION_1_8;targetCompatibility JavaVersion.VERSION_1_8}
+ bundle{language{enableSplit=false}}
+ packagingOptions{jniLibs{useLegacyPackaging=true};pickFirst '**/libbytehook.so'}
+ buildFeatures{prefab true;buildConfig true}
 }
 class AssetTaskRegistrar {
  private Project project; private Task mergeAssetsTask; private File targetAssetsDir; private String variantName; private File targetDownloadDir; private File projectJarDir;
