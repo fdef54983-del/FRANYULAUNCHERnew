@@ -2,6 +2,7 @@ package net.kdt.pojavlaunch.fragments;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -11,6 +12,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
 
@@ -39,7 +41,7 @@ public class UpdateChecker implements AutoCloseable {
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private boolean closed;
+    private volatile boolean closed;
 
     public static final class Update {
         public final String version;
@@ -63,7 +65,7 @@ public class UpdateChecker implements AutoCloseable {
 
     public void check(Callback callback) {
         long last = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getLong(KEY_CHECK, 0);
+                .getLong(KEY_CHECK, 0L);
         if (System.currentTimeMillis() - last < CHECK_INTERVAL) return;
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putLong(KEY_CHECK, System.currentTimeMillis()).apply();
@@ -99,10 +101,9 @@ public class UpdateChecker implements AutoCloseable {
                             for (int i = 0; i < assets.size(); i++) {
                                 JsonObject asset = assets.get(i).getAsJsonObject();
                                 String name = asset.get("name").getAsString().toLowerCase();
-                                if (name.equals("franyulauncher-1.3.apk") ||
-                                        (name.endsWith(".apk") && !name.contains("noruntime"))) {
+                                if (name.equals("franyulauncher-1.3.apk")) {
                                     apk = asset.get("browser_download_url").getAsString();
-                                    if (name.equals("franyulauncher-1.3.apk")) break;
+                                    break;
                                 }
                             }
                         }
@@ -117,9 +118,11 @@ public class UpdateChecker implements AutoCloseable {
                 if (connection != null) connection.disconnect();
             }
             Update result = update;
-            if (!closed) main.post(() -> {
-                if (!closed && callback != null) callback.onResult(result);
-            });
+            if (!closed) {
+                main.post(() -> {
+                    if (!closed && callback != null) callback.onResult(result);
+                });
+            }
         });
     }
 
@@ -142,7 +145,7 @@ public class UpdateChecker implements AutoCloseable {
         for (int n = 0; n < parts.length; n++) {
             try {
                 result[n] = Integer.parseInt(parts[n]);
-            } catch (Exception e) {
+            } catch (NumberFormatException e) {
                 result[n] = 0;
             }
         }
@@ -159,7 +162,7 @@ public class UpdateChecker implements AutoCloseable {
         executor.execute(() -> {
             File apk = new File(context.getCacheDir(), "franyulauncher-" + update.version + ".apk");
             try {
-                if (!apk.isFile() || apk.length() < 1024) {
+                if (!apk.isFile() || apk.length() < 1024L) {
                     if (apk.exists() && !apk.delete()) {
                         throw new java.io.IOException("No se puede reemplazar la APK temporal");
                     }
@@ -170,9 +173,9 @@ public class UpdateChecker implements AutoCloseable {
                         .putString(KEY_PENDING_APK, apk.getAbsolutePath()).apply();
                 main.post(() -> launchInstaller(activity, apk));
             } catch (Exception e) {
-                if (!closed) main.post(() -> android.widget.Toast.makeText(activity,
-                        "La actualización no es válida o no se pudo descargar. Comprueba la conexión e inténtalo de nuevo.",
-                        android.widget.Toast.LENGTH_LONG).show());
+                if (!closed) main.post(() -> Toast.makeText(activity,
+                        "No se puede instalar esta actualización. Comprueba que la APK sea compatible con tu instalación actual.",
+                        Toast.LENGTH_LONG).show());
             }
         });
     }
@@ -199,22 +202,19 @@ public class UpdateChecker implements AutoCloseable {
     }
 
     private void validateApk(File apk) throws Exception {
-        if (!apk.isFile() || !apk.canRead() || apk.length() < 1024) {
+        if (!apk.isFile() || !apk.canRead() || apk.length() < 1024L) {
             throw new java.io.IOException("APK inexistente o incompleta");
         }
         PackageManager pm = context.getPackageManager();
-        PackageInfo info = pm.getPackageArchiveInfo(apk.getAbsolutePath(), 0);
+        PackageInfo info = pm.getPackageArchiveInfo(apk.getAbsolutePath(),
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                        ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES);
         if (info == null || !context.getPackageName().equals(info.packageName)) {
             throw new java.io.IOException("La APK no pertenece a FranyuLauncher");
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && info.signingInfo != null) {
-            if (info.signingInfo.hasMultipleSigners()) {
-                if (info.signingInfo.getApkContentsSigners().length == 0) {
-                    throw new java.io.IOException("Firma APK inválida");
-                }
-            } else if (info.signingInfo.getSigningCertificateHistory().length == 0) {
-                throw new java.io.IOException("Firma APK inválida");
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && info.signingInfo != null
+                && info.signingInfo.getApkContentsSigners().length == 0) {
+            throw new java.io.IOException("La APK no tiene una firma válida");
         }
     }
 
@@ -234,6 +234,10 @@ public class UpdateChecker implements AutoCloseable {
     }
 
     private void launchInstaller(Activity activity, File apk) {
+        if (!apk.isFile()) {
+            clearPendingInstall();
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && !activity.getPackageManager().canRequestPackageInstalls()) {
             Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -241,31 +245,39 @@ public class UpdateChecker implements AutoCloseable {
             activity.startActivity(settings);
             return;
         }
+
         Uri uri = FileProvider.getUriForFile(context,
                 context.getPackageName() + ".updateprovider", apk);
         Intent installIntent = new Intent(Intent.ACTION_INSTALL_PACKAGE);
         installIntent.setDataAndType(uri, "application/vnd.android.package-archive");
         installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        installIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        installIntent.setClipData(ClipData.newRawUri("FranyuLauncher APK", uri));
+
         try {
             activity.startActivity(installIntent);
             clearPendingInstall();
             return;
         } catch (ActivityNotFoundException ignored) {
+        } catch (SecurityException e) {
+            Toast.makeText(activity,
+                    "Android bloqueó el instalador. Permite instalar aplicaciones desde FranyuLauncher.",
+                    Toast.LENGTH_LONG).show();
+            return;
         }
 
         Intent viewIntent = new Intent(Intent.ACTION_VIEW);
         viewIntent.setDataAndType(uri, "application/vnd.android.package-archive");
         viewIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         viewIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        viewIntent.setClipData(ClipData.newRawUri("FranyuLauncher APK", uri));
         try {
             activity.startActivity(viewIntent);
             clearPendingInstall();
         } catch (Exception e) {
-            android.widget.Toast.makeText(activity,
+            Toast.makeText(activity,
                     "Android no encontró un instalador de APK disponible.",
-                    android.widget.Toast.LENGTH_LONG).show();
+                    Toast.LENGTH_LONG).show();
         }
     }
 
