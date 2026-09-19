@@ -107,6 +107,7 @@
                         android:id="@+id/active_instance_icon"
                         android:layout_width="58dp"
                         android:layout_height="58dp"
+                        android:tint="@color/emerald_accent"
                         android:contentDescription="@string/app_name"/>
 
                     <LinearLayout
