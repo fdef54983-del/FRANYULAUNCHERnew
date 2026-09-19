@@ -255,7 +255,7 @@ public class MainMenuFragment extends Fragment {
         body.setLineSpacing(0, 1.12f);
         body.setPadding(0, 7, 0, 7);
         scroll.addView(body);
-        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(-1, 0, 1f);
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(-1, (int) (280 * getResources().getDisplayMetrics().density));
         scrollParams.topMargin = 4;
         scrollParams.bottomMargin = 8;
         root.addView(scroll, scrollParams);
