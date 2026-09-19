@@ -76,7 +76,7 @@ public class UpdateChecker implements AutoCloseable {
                         int n;
                         while ((n = in.read(buffer)) != -1) json.append(new String(buffer, 0, n, "UTF-8"));
                     }
-                    JsonObject release = JsonParser.parseString(json.toString()).getAsJsonObject();
+                    JsonObject release = new JsonParser().parse(json.toString()).getAsJsonObject();
                     String tag = release.has("tag_name") ? release.get("tag_name").getAsString() : "";
                     String version = tag.startsWith("v") ? tag.substring(1) : tag;
                     String installed = BuildConfig.VERSION_NAME == null ? "" : BuildConfig.VERSION_NAME;
