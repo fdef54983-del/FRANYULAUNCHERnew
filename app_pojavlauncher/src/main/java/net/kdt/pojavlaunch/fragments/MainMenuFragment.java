@@ -139,7 +139,7 @@ public class MainMenuFragment extends Fragment {
         if (instanceName == null) instanceName = safeVersion(instance.versionId);
         name.setText(instanceName);
         details.setText(safeVersion(instance.versionId) + " • " + detectModLoader(instance));
-        mods.setText(getString(R.string.mcl_launch_downloading_progress).replace("%s", "Mods: " + countMods(instance)));
+        mods.setText("Mods: " + countMods(instance));
     }
 
     private String safeVersion(String version) {
@@ -186,7 +186,7 @@ public class MainMenuFragment extends Fragment {
         for (int index = 0; index < shown; index++) {
             Instance instance = instances.get(index);
             TextView item = new TextView(requireContext());
-            item.setMinHeight(56);
+            item.setMinHeight(68);
             item.setGravity(android.view.Gravity.CENTER_VERTICAL);
             item.setPadding(16, 8, 16, 8);
             item.setTextColor(ContextCompat.getColor(requireContext(), R.color.primary_text));
