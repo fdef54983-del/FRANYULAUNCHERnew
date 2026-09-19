@@ -40,75 +40,75 @@ jobs:
       - name: Create out directory
         run: mkdir -p out
 
-      - name: Build FranyuLauncher 1.2 APK
+      - name: Set FranyuLauncher 1.3 version
+        run: sed -i 's/return "1\.2-${dateToday}/return "1.3-${dateToday}/' app_pojavlauncher/build.gradle
+
+      - name: Build FranyuLauncher 1.3 APK
         run: |
           gradle :app_pojavlauncher:assembleFullRelease
-          mv app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/FranyuLauncher-1.2.apk
+          mv app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/FranyuLauncher-1.3.apk
 
-      - name: Build FranyuLauncher 1.2 AAB
+      - name: Build FranyuLauncher 1.3 AAB
         run: |
           gradle :app_pojavlauncher:bundleFullRelease
-          mv app_pojavlauncher/build/outputs/bundle/fullRelease/app_pojavlauncher-full-release.aab out/FranyuLauncher-1.2.aab
+          mv app_pojavlauncher/build/outputs/bundle/fullRelease/app_pojavlauncher-full-release.aab out/FranyuLauncher-1.3.aab
 
       - name: Build Debug APK (No runtime)
         run: |
           gradle :app_pojavlauncher:assembleNoruntimeDebug
-          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/FranyuLauncher-1.2-noruntime.apk
+          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/FranyuLauncher-1.3-noruntime.apk
 
       - name: Verify APK and AAB archives before publishing
         run: |
           set -e
-          test -s out/FranyuLauncher-1.2.apk
-          test -s out/FranyuLauncher-1.2-noruntime.apk
-          test -s out/FranyuLauncher-1.2.aab
-          unzip -t out/FranyuLauncher-1.2.apk
-          unzip -t out/FranyuLauncher-1.2-noruntime.apk
-          unzip -t out/FranyuLauncher-1.2.aab
+          test -s out/FranyuLauncher-1.3.apk
+          test -s out/FranyuLauncher-1.3-noruntime.apk
+          test -s out/FranyuLauncher-1.3.aab
+          unzip -t out/FranyuLauncher-1.3.apk
+          unzip -t out/FranyuLauncher-1.3-noruntime.apk
+          unzip -t out/FranyuLauncher-1.3.aab
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose out/FranyuLauncher-1.2.apk
+          "$APKSIGNER" verify --verbose out/FranyuLauncher-1.3.apk
 
       - name: Generate SHA-256 checksums
         run: |
-          sha256sum out/FranyuLauncher-1.2.apk > out/FranyuLauncher-1.2.apk.sha256
-          sha256sum out/FranyuLauncher-1.2-noruntime.apk > out/FranyuLauncher-1.2-noruntime.apk.sha256
-          sha256sum out/FranyuLauncher-1.2.aab > out/FranyuLauncher-1.2.aab.sha256
+          sha256sum out/FranyuLauncher-1.3.apk > out/FranyuLauncher-1.3.apk.sha256
+          sha256sum out/FranyuLauncher-1.3-noruntime.apk > out/FranyuLauncher-1.3-noruntime.apk.sha256
+          sha256sum out/FranyuLauncher-1.3.aab > out/FranyuLauncher-1.3.aab.sha256
 
-      - name: Upload FranyuLauncher 1.2 artifacts
+      - name: Upload FranyuLauncher 1.3 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: FranyuLauncher-1.2
+          name: FranyuLauncher-1.3
           path: |
-            out/FranyuLauncher-1.2.apk
-            out/FranyuLauncher-1.2.apk.sha256
-            out/FranyuLauncher-1.2-noruntime.apk
-            out/FranyuLauncher-1.2-noruntime.apk.sha256
-            out/FranyuLauncher-1.2.aab
-            out/FranyuLauncher-1.2.aab.sha256
+            out/FranyuLauncher-1.3.apk
+            out/FranyuLauncher-1.3.apk.sha256
+            out/FranyuLauncher-1.3-noruntime.apk
+            out/FranyuLauncher-1.3-noruntime.apk.sha256
+            out/FranyuLauncher-1.3.aab
+            out/FranyuLauncher-1.3.aab.sha256
           compression-level: 0
 
-      - name: Create GitHub Release v1.2
+      - name: Create GitHub Release v1.3
         uses: softprops/action-gh-release@v2
         if: github.repository_owner == 'fdef54983-del' && github.ref_name == 'feat/standard_cursors'
         with:
-          tag_name: "v1.2"
-          name: "FranyuLauncher v1.2"
+          tag_name: "v1.3"
+          name: "FranyuLauncher v1.3"
           body: |
-            ### FranyuLauncher v1.2
+            ### FranyuLauncher v1.3
             - Rebrand cleanup and FranyuLauncher crash reporting.
             - Resilient downloads with concurrent workers, retries, exponential backoff and HTTP Range resume.
             - SHA-256 checksums for published artifacts.
             - Release APK and AAB builds without requiring the unavailable mojo_upload.jks signing secret.
             - Deferred non-critical runtime initialization and session version-list caching.
-
-            **APK:** direct installation artifact.
-            **AAB:** Android App Bundle for store distribution.
           draft: false
           prerelease: false
           files: |
-            out/FranyuLauncher-1.2.apk
-            out/FranyuLauncher-1.2.apk.sha256
-            out/FranyuLauncher-1.2-noruntime.apk
-            out/FranyuLauncher-1.2-noruntime.apk.sha256
-            out/FranyuLauncher-1.2.aab
-            out/FranyuLauncher-1.2.aab.sha256
+            out/FranyuLauncher-1.3.apk
+            out/FranyuLauncher-1.3.apk.sha256
+            out/FranyuLauncher-1.3-noruntime.apk
+            out/FranyuLauncher-1.3-noruntime.apk.sha256
+            out/FranyuLauncher-1.3.aab
+            out/FranyuLauncher-1.3.aab.sha256
