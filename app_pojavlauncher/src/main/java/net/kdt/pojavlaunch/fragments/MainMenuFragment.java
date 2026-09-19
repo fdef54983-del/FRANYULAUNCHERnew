@@ -3,11 +3,15 @@ package net.kdt.pojavlaunch.fragments;
 import static net.kdt.pojavlaunch.Tools.openPath;
 import static net.kdt.pojavlaunch.Tools.shareLog;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
@@ -48,9 +52,7 @@ public class MainMenuFragment extends Fragment {
 
     private mcVersionSpinner mVersionSpinner;
     private LinearLayout mRecentInstances;
-    private View mUpdateCard;
-    private TextView mUpdateVersion;
-    private TextView mUpdateBody;
+    private AlertDialog mUpdateDialog;
     private UpdateChecker mUpdateChecker;
     private UpdateChecker.Update mLatestUpdate;
 
@@ -77,9 +79,6 @@ public class MainMenuFragment extends Fragment {
 
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
         mRecentInstances = view.findViewById(R.id.recent_instances_container);
-        mUpdateCard = view.findViewById(R.id.update_card);
-        mUpdateVersion = view.findViewById(R.id.update_version);
-        mUpdateBody = view.findViewById(R.id.update_body);
         mUpdateChecker = new UpdateChecker(requireContext());
 
         news.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
@@ -101,16 +100,6 @@ public class MainMenuFragment extends Fragment {
         news.setOnLongClickListener(v -> {
             Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
             return true;
-        });
-
-        Button updateInstall = view.findViewById(R.id.update_install_button);
-        Button updateSkip = view.findViewById(R.id.update_skip_button);
-        updateInstall.setOnClickListener(v -> {
-            if (mLatestUpdate != null) mUpdateChecker.install(mLatestUpdate, requireActivity());
-        });
-        updateSkip.setOnClickListener(v -> {
-            if (mLatestUpdate != null) mUpdateChecker.skipVersion(mLatestUpdate.version);
-            mUpdateCard.setVisibility(View.GONE);
         });
 
         refreshSelectedInstance(view);
@@ -217,15 +206,81 @@ public class MainMenuFragment extends Fragment {
 
     private void checkForUpdate() {
         mUpdateChecker.check(update -> {
-            if (!isAdded() || update == null) return;
-            mUpdateVersion.setText("FranyuLauncher " + update.version);
-            String body = TextUtils.isEmpty(update.body) ? "No release notes provided." : update.body.trim();
-            mUpdateBody.setText(body);
-            mUpdateBody.setMaxLines(6);
-            mUpdateBody.setEllipsize(TextUtils.TruncateAt.END);
+            if (!isAdded() || update == null || mUpdateDialog != null) return;
             mLatestUpdate = update;
-            mUpdateCard.setVisibility(View.VISIBLE);
+            showUpdateDialog(update);
         });
+    }
+
+    private void showUpdateDialog(UpdateChecker.Update update) {
+        if (!isAdded()) return;
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(padding, padding, padding, padding);
+
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.rgb(22, 25, 29));
+        background.setCornerRadius(22 * getResources().getDisplayMetrics().density);
+        root.setBackground(background);
+
+        TextView title = new TextView(requireContext());
+        title.setText("Nueva actualización");
+        title.setTextColor(Color.rgb(80, 220, 150));
+        title.setTextSize(21);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        root.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView version = new TextView(requireContext());
+        version.setText("FranyuLauncher " + update.version);
+        version.setTextColor(Color.WHITE);
+        version.setTextSize(16);
+        version.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        version.setPadding(0, 6, 0, 12);
+        root.addView(version, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView label = new TextView(requireContext());
+        label.setText("Novedades");
+        label.setTextColor(Color.rgb(210, 215, 220));
+        label.setTextSize(13);
+        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        root.addView(label, new LinearLayout.LayoutParams(-1, -2));
+
+        ScrollView scroll = new ScrollView(requireContext());
+        TextView body = new TextView(requireContext());
+        body.setText(update.body == null ? "" : update.body);
+        body.setTextColor(Color.rgb(190, 195, 200));
+        body.setTextSize(14);
+        body.setLineSpacing(0, 1.12f);
+        body.setPadding(0, 7, 0, 7);
+        scroll.addView(body);
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(-1, 0, 1f);
+        scrollParams.topMargin = 4;
+        scrollParams.bottomMargin = 8;
+        root.addView(scroll, scrollParams);
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setView(root)
+                .setNegativeButton("Omitir para después", (d, which) -> {
+                    mUpdateChecker.skipVersion(update.version);
+                    mLatestUpdate = null;
+                })
+                .setPositiveButton("Instalar", (d, which) -> {
+                    mUpdateChecker.install(update, requireActivity());
+                    mLatestUpdate = null;
+                })
+                .create();
+
+        dialog.setOnShowListener(d -> {
+            Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            if (positive != null) positive.setTextColor(Color.rgb(80, 220, 150));
+            Button negative = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+            if (negative != null) negative.setTextColor(Color.rgb(170, 175, 180));
+        });
+        dialog.setOnDismissListener(d -> mUpdateDialog = null);
+        mUpdateDialog = dialog;
+        dialog.show();
     }
 
     private void openGameDirectory(Context context) {
@@ -240,6 +295,19 @@ public class MainMenuFragment extends Fragment {
         } else {
             Toast.makeText(context, R.string.gamedir_open_failed, Toast.LENGTH_LONG).show();
         }
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (mUpdateDialog != null) {
+            mUpdateDialog.dismiss();
+            mUpdateDialog = null;
+        }
+        if (mUpdateChecker != null) {
+            mUpdateChecker.close();
+            mUpdateChecker = null;
+        }
+        super.onDestroyView();
     }
 
     @Override
