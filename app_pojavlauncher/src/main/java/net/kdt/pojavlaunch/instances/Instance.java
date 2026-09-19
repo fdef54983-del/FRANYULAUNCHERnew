@@ -32,6 +32,8 @@ public class Instance {
     public String controlLayout;
     public String icon;
     public boolean sharedData;
+    /** Last successful launch request timestamp, persisted with the instance metadata. */
+    public long lastPlayedAt;
 
     protected Instance() {
     }
