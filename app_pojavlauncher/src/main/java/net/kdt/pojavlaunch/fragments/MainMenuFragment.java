@@ -72,6 +72,7 @@ public class MainMenuFragment extends Fragment {
         Button shareLogs = view.findViewById(R.id.share_logs_button);
         Button openDirectory = view.findViewById(R.id.open_files_button);
         ImageButton editProfile = view.findViewById(R.id.edit_profile_button);
+        ImageButton railHome = view.findViewById(R.id.rail_home);
         Button play = view.findViewById(R.id.play_button);
 
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
@@ -90,7 +91,8 @@ public class MainMenuFragment extends Fragment {
         shareLogs.setOnClickListener(v -> shareLog(requireContext()));
         openDirectory.setOnClickListener(v -> openGameDirectory(v.getContext()));
 
-        view.findViewById(R.id.rail_home).setOnClickListener(v -> v.setSelected(true));
+        railHome.setSelected(true);
+        railHome.setOnClickListener(v -> v.setSelected(true));
         view.findViewById(R.id.rail_instances).setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
         view.findViewById(R.id.rail_mods).setOnClickListener(v -> runInstallerWithConfirmation());
         view.findViewById(R.id.rail_settings).setOnClickListener(v ->
@@ -140,6 +142,9 @@ public class MainMenuFragment extends Fragment {
         name.setText(instanceName);
         details.setText(safeVersion(instance.versionId) + " • " + detectModLoader(instance));
         mods.setText("Mods: " + countMods(instance));
+        android.widget.ImageView icon = root.findViewById(R.id.active_instance_icon);
+        android.graphics.drawable.Drawable instanceIcon = InstanceIconProvider.fetchIcon(getResources(), instance);
+        if (instanceIcon != null) icon.setImageDrawable(instanceIcon);
     }
 
     private String safeVersion(String version) {
