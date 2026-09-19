@@ -10,7 +10,6 @@ import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -18,7 +17,6 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
@@ -26,7 +24,6 @@ import com.kdt.mcgui.mcVersionSpinner;
 
 import net.kdt.pojavlaunch.CustomControlsActivity;
 import git.artdeell.mojo.R;
-
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
@@ -34,7 +31,6 @@ import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceIconProvider;
 import net.kdt.pojavlaunch.instances.InstanceManager;
-import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.utils.FileUtils;
@@ -59,11 +55,11 @@ public class MainMenuFragment extends Fragment {
     private UpdateChecker.Update mLatestUpdate;
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
-            registerForActivityResult(new OpenDocumentWithExtension("jar"), (data)->{
-                if(data != null) Tools.launchModInstaller(requireContext(), data);
+            registerForActivityResult(new OpenDocumentWithExtension("jar"), (data) -> {
+                if (data != null) Tools.launchModInstaller(requireContext(), data);
             });
 
-    public MainMenuFragment(){
+    public MainMenuFragment() {
         super(R.layout.fragment_launcher);
     }
 
@@ -94,9 +90,7 @@ public class MainMenuFragment extends Fragment {
         shareLogs.setOnClickListener(v -> shareLog(requireContext()));
         openDirectory.setOnClickListener(v -> openGameDirectory(v.getContext()));
 
-        view.findViewById(R.id.rail_home).setOnClickListener(v -> {
-            v.setSelected(true);
-        });
+        view.findViewById(R.id.rail_home).setOnClickListener(v -> v.setSelected(true));
         view.findViewById(R.id.rail_instances).setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
         view.findViewById(R.id.rail_mods).setOnClickListener(v -> runInstallerWithConfirmation());
         view.findViewById(R.id.rail_settings).setOnClickListener(v ->
@@ -109,7 +103,9 @@ public class MainMenuFragment extends Fragment {
 
         Button updateInstall = view.findViewById(R.id.update_install_button);
         Button updateSkip = view.findViewById(R.id.update_skip_button);
-        updateInstall.setOnClickListener(v -> mUpdateChecker.install(mLatestUpdate, requireActivity()));
+        updateInstall.setOnClickListener(v -> {
+            if (mLatestUpdate != null) mUpdateChecker.install(mLatestUpdate, requireActivity());
+        });
         updateSkip.setOnClickListener(v -> {
             if (mLatestUpdate != null) mUpdateChecker.skipVersion(mLatestUpdate.version);
             mUpdateCard.setVisibility(View.GONE);
@@ -122,6 +118,10 @@ public class MainMenuFragment extends Fragment {
 
     private void launchSelectedInstance() {
         Instance selected = InstanceManager.getSelectedListedInstance();
+        if (selected == null) {
+            Toast.makeText(requireContext(), R.string.error_no_version, Toast.LENGTH_LONG).show();
+            return;
+        }
         selected.lastPlayedAt = System.currentTimeMillis();
         selected.maybeWrite();
         ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
@@ -133,38 +133,37 @@ public class MainMenuFragment extends Fragment {
         TextView name = root.findViewById(R.id.active_instance_name);
         TextView details = root.findViewById(R.id.active_instance_details);
         TextView mods = root.findViewById(R.id.active_instance_mods);
-        if(instance == null) return;
+        if (instance == null) return;
 
         String instanceName = Tools.validOrNullString(instance.name);
-        if(instanceName == null) instanceName = getString(R.string.main_instance_default_name);
+        if (instanceName == null) instanceName = safeVersion(instance.versionId);
         name.setText(instanceName);
-        details.setText(getString(R.string.main_instance_details, safeVersion(instance.versionId), detectModLoader(instance)));
-        mods.setText(getString(R.string.main_instance_mods, countMods(instance)));
+        details.setText(safeVersion(instance.versionId) + " • " + detectModLoader(instance));
+        mods.setText(getString(R.string.mcl_launch_downloading_progress).replace("%s", "Mods: " + countMods(instance)));
     }
 
     private String safeVersion(String version) {
-        if(version == null || version.trim().isEmpty()) return getString(R.string.main_unknown);
-        return version;
+        return version == null || version.trim().isEmpty() ? "Unknown" : version;
     }
 
     private String detectModLoader(Instance instance) {
-        if(instance.installer != null) {
+        if (instance.installer != null) {
             String name = instance.installer.getClass().getSimpleName().toLowerCase();
-            if(name.contains("forge")) return "Forge";
-            if(name.contains("fabric")) return "Fabric";
-            if(name.contains("quilt")) return "Quilt";
-            if(name.contains("neoforge")) return "NeoForge";
+            if (name.contains("neoforge")) return "NeoForge";
+            if (name.contains("forge")) return "Forge";
+            if (name.contains("fabric")) return "Fabric";
+            if (name.contains("quilt")) return "Quilt";
         }
         File mods = new File(instance.getGameDirectory(), "mods");
-        if(mods.isDirectory()) {
+        if (mods.isDirectory()) {
             File[] files = mods.listFiles();
-            if(files != null) {
-                for(File file : files) {
+            if (files != null) {
+                for (File file : files) {
                     String n = file.getName().toLowerCase();
-                    if(n.contains("fabric")) return "Fabric";
-                    if(n.contains("neoforge")) return "NeoForge";
-                    if(n.contains("forge")) return "Forge";
-                    if(n.contains("quilt")) return "Quilt";
+                    if (n.contains("neoforge")) return "NeoForge";
+                    if (n.contains("fabric")) return "Fabric";
+                    if (n.contains("forge")) return "Forge";
+                    if (n.contains("quilt")) return "Quilt";
                 }
             }
         }
@@ -179,12 +178,12 @@ public class MainMenuFragment extends Fragment {
     }
 
     private void renderRecentInstances() {
-        if(mRecentInstances == null) return;
+        if (mRecentInstances == null) return;
         mRecentInstances.removeAllViews();
         List<Instance> instances = new ArrayList<>(InstanceManager.getImmutableInstanceList());
         Collections.sort(instances, Comparator.comparingLong((Instance i) -> i.lastPlayedAt).reversed());
         int shown = Math.min(5, instances.size());
-        for(int index = 0; index < shown; index++) {
+        for (int index = 0; index < shown; index++) {
             Instance instance = instances.get(index);
             TextView item = new TextView(requireContext());
             item.setMinHeight(56);
@@ -193,8 +192,8 @@ public class MainMenuFragment extends Fragment {
             item.setTextColor(ContextCompat.getColor(requireContext(), R.color.primary_text));
             item.setTextSize(14);
             String name = Tools.validOrNullString(instance.name);
-            if(name == null) name = safeVersion(instance.versionId);
-            String when = instance.lastPlayedAt <= 0 ? getString(R.string.main_never_played)
+            if (name == null) name = safeVersion(instance.versionId);
+            String when = instance.lastPlayedAt <= 0 ? "Never played"
                     : DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(instance.lastPlayedAt));
             item.setText(name + "\n" + when);
             item.setCompoundDrawablesRelativeWithIntrinsicBounds(
@@ -203,7 +202,7 @@ public class MainMenuFragment extends Fragment {
             item.setBackgroundResource(R.drawable.recent_instance_bg);
             item.setOnClickListener(v -> {
                 InstanceManager.setSelectedInstance(instance);
-                mVersionSpinner.setSelection(mVersionSpinner.resolveInstanceIndex(instance));
+                mVersionSpinner.reloadProfiles();
                 refreshSelectedInstance(requireView());
                 renderRecentInstances();
             });
@@ -213,9 +212,9 @@ public class MainMenuFragment extends Fragment {
 
     private void checkForUpdate() {
         mUpdateChecker.check(update -> {
-            if(!isAdded() || update == null) return;
-            mUpdateVersion.setText(getString(R.string.update_available_version, update.version));
-            String body = TextUtils.isEmpty(update.body) ? getString(R.string.update_no_notes) : update.body.trim();
+            if (!isAdded() || update == null) return;
+            mUpdateVersion.setText("FranyuLauncher " + update.version);
+            String body = TextUtils.isEmpty(update.body) ? "No release notes provided." : update.body.trim();
             mUpdateBody.setText(body);
             mUpdateBody.setMaxLines(6);
             mUpdateBody.setEllipsize(TextUtils.TruncateAt.END);
@@ -225,10 +224,15 @@ public class MainMenuFragment extends Fragment {
     }
 
     private void openGameDirectory(Context context) {
-        File gameDirectory = InstanceManager.getSelectedListedInstance().getGameDirectory();
-        if(FileUtils.ensureDirectorySilently(gameDirectory)) {
+        Instance selected = InstanceManager.getSelectedListedInstance();
+        if (selected == null) {
+            Toast.makeText(context, R.string.error_no_version, Toast.LENGTH_LONG).show();
+            return;
+        }
+        File gameDirectory = selected.getGameDirectory();
+        if (FileUtils.ensureDirectorySilently(gameDirectory)) {
             openPath(context, gameDirectory, false);
-        }else {
+        } else {
             Toast.makeText(context, R.string.gamedir_open_failed, Toast.LENGTH_LONG).show();
         }
     }
@@ -237,7 +241,7 @@ public class MainMenuFragment extends Fragment {
     public void onResume() {
         super.onResume();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
-        if(getView() != null) {
+        if (getView() != null) {
             refreshSelectedInstance(getView());
             renderRecentInstances();
             checkForUpdate();
@@ -247,12 +251,14 @@ public class MainMenuFragment extends Fragment {
     private void runInstallerWithConfirmation() {
         if (ProgressKeeper.getTaskCount() == 0) {
             mModInstallerLauncher.launch(null);
-        } else Toast.makeText(requireContext(), R.string.tasks_ongoing, Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(requireContext(), R.string.tasks_ongoing, Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
     public void onDestroyView() {
-        if(mUpdateChecker != null) mUpdateChecker.close();
+        if (mUpdateChecker != null) mUpdateChecker.close();
         super.onDestroyView();
     }
 }
