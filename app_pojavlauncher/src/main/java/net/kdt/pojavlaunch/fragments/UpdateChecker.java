@@ -31,7 +31,6 @@ import java.util.concurrent.Executors;
 import git.artdeell.mojo.BuildConfig;
 
 public class UpdateChecker implements AutoCloseable {
-    private static final long CHECK_INTERVAL = 60L * 60L * 1000L;
     private static final String RELEASES_URL =
             "https://api.github.com/repos/fdef54983-del/FRANYULAUNCHERnew/releases/latest";
     private static final String PREFS = "franyu_updates";
@@ -64,12 +63,6 @@ public class UpdateChecker implements AutoCloseable {
     }
 
     public void check(Callback callback) {
-        long last = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getLong(KEY_CHECK, 0L);
-        if (System.currentTimeMillis() - last < CHECK_INTERVAL) return;
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putLong(KEY_CHECK, System.currentTimeMillis()).apply();
-
         executor.execute(() -> {
             Update update = null;
             HttpURLConnection connection = null;
