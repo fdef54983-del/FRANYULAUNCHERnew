@@ -1,36 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/fragment_menu_main"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/background_app">
-
-    <LinearLayout
-        android:id="@+id/side_rail"
-        android:layout_width="58dp"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="top|center_horizontal"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
-        android:background="@color/background_bottom_bar"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
-
-        <ImageButton android:id="@+id/rail_home" android:layout_width="48dp" android:layout_height="48dp" android:layout_marginBottom="8dp" android:padding="12dp" android:background="@drawable/rail_item_bg" android:src="@drawable/ic_px_home" android:tint="@color/emerald_accent" android:contentDescription="Inicio"/>
-        <ImageButton android:id="@+id/rail_instances" android:layout_width="48dp" android:layout_height="48dp" android:layout_marginBottom="8dp" android:padding="12dp" android:background="@drawable/rail_item_bg" android:src="@drawable/ic_px_sliders" android:tint="@color/emerald_accent" android:contentDescription="Instancias"/>
-        <ImageButton android:id="@+id/rail_mods" android:layout_width="48dp" android:layout_height="48dp" android:layout_marginBottom="8dp" android:padding="12dp" android:background="@drawable/rail_item_bg" android:src="@drawable/ic_px_gamepad" android:tint="@color/emerald_accent" android:contentDescription="Mods"/>
-        <ImageButton android:id="@+id/rail_settings" android:layout_width="48dp" android:layout_height="48dp" android:padding="12dp" android:background="@drawable/rail_item_bg" android:src="@drawable/ic_px_sliders" android:tint="@color/emerald_accent" android:contentDescription="Configuración"/>
-    </LinearLayout>
-
-    <ScrollView android:id="@+id/main_scroll" android:layout_width="0dp" android:layout_height="0dp" android:fillViewport="true" android:scrollbars="none" app:layout_constraintStart_toEndOf="@id/side_rail" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent">
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/fragment_menu_main" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/background_app">
+    <LinearLayout android:id="@+id/side_rail" android:layout_width="58dp" android:layout_height="match_parent" android:orientation="vertical" android:visibility="gone" android:background="@color/background_bottom_bar" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"/>
+    <ScrollView android:id="@+id/main_scroll" android:layout_width="0dp" android:layout_height="0dp" android:fillViewport="true" android:scrollbars="none" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
             <LinearLayout android:id="@+id/active_instance_card" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp" android:background="@drawable/hero_instance_bg">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="INSTANCIA ACTIVA" android:textColor="@color/secondary_text" android:textSize="11sp" android:textStyle="bold"/>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center_vertical" android:orientation="horizontal">
-                    <ImageView android:id="@+id/active_instance_icon" android:layout_width="58dp" android:layout_height="58dp" android:scaleType="centerCrop" android:contentDescription="@string/app_name"/>
+                    <ImageView android:id="@+id/active_instance_icon" android:layout_width="58dp" android:layout_height="58dp" android:scaleType="centerCrop" android:tint="@color/emerald_accent" android:contentDescription="@string/app_name"/>
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:orientation="vertical">
                         <TextView android:id="@+id/active_instance_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/primary_text" android:textSize="20sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
                         <TextView android:id="@+id/active_instance_details" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="@color/secondary_text" android:textSize="12sp" android:maxLines="1" android:ellipsize="end"/>
@@ -44,7 +20,6 @@
                 </LinearLayout>
                 <com.kdt.mcgui.mcVersionSpinner android:id="@+id/mc_version_spinner" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone"/>
             </LinearLayout>
-
             <LinearLayout android:id="@+id/update_card" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="14dp" android:layout_marginTop="10dp" android:background="@drawable/update_card_bg" android:visibility="gone">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Actualización disponible" android:textColor="@color/emerald_accent" android:textStyle="bold"/>
                 <TextView android:id="@+id/update_version" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/primary_text" android:textSize="16sp" android:textStyle="bold" android:layout_marginTop="4dp"/>
@@ -54,7 +29,6 @@
                     <Button android:id="@+id/update_install_button" android:layout_width="wrap_content" android:layout_height="44dp" android:layout_marginStart="8dp" android:text="Instalar" android:textColor="@color/primary_text" android:background="@drawable/rail_item_bg"/>
                 </LinearLayout>
             </LinearLayout>
-
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Instancias recientes" android:textColor="@color/primary_text" android:textSize="17sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp"/>
             <LinearLayout android:id="@+id/recent_instances_container" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@drawable/card_menu_bg" android:layout_marginTop="12dp">

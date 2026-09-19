@@ -82,7 +82,12 @@ public class InstanceIconProvider {
         int staticIconResource = getStaticIconResource(icon);
         if (staticIconResource == -1) return null;
         Drawable drawable = ResourcesCompat.getDrawable(resources, staticIconResource, null);
-        if (drawable != null) drawable.clearColorFilter();
+        if (drawable != null) {
+            drawable.clearColorFilter();
+            if (FALLBACK_ICON_NAME.equals(icon)) {
+                drawable.setTint(resources.getColor(R.color.emerald_accent));
+            }
+        }
         return drawable;
     }
 
