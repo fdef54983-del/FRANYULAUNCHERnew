@@ -13,7 +13,7 @@
         app:layout_constraintBottom_toBottomOf="parent">
         <ImageButton android:id="@+id/rail_home" android:layout_width="48dp" android:layout_height="48dp"
             android:layout_marginBottom="8dp" android:padding="12dp" android:background="@drawable/rail_item_bg"
-            android:src="@drawable/ic_px_home" android:contentDescription="Inicio" android:selected="true"/>
+            android:src="@drawable/ic_px_home" android:contentDescription="Inicio"/>
         <ImageButton android:id="@+id/rail_instances" android:layout_width="48dp" android:layout_height="48dp"
             android:layout_marginBottom="8dp" android:padding="12dp" android:background="@drawable/rail_item_bg"
             android:src="@drawable/ic_px_sliders" android:contentDescription="Instancias"/>
