@@ -25,16 +25,7 @@
                 </LinearLayout>
                 <com.kdt.mcgui.mcVersionSpinner android:id="@+id/mc_version_spinner" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone"/>
             </LinearLayout>
-            <LinearLayout android:id="@+id/update_card" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="14dp" android:layout_marginTop="10dp" android:background="@drawable/update_card_bg" android:visibility="gone">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Actualización disponible" android:textColor="@color/emerald_accent" android:textStyle="bold"/>
-                <TextView android:id="@+id/update_version" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/primary_text" android:textSize="16sp" android:textStyle="bold" android:layout_marginTop="4dp"/>
-                <TextView android:id="@+id/update_body" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/secondary_text" android:textSize="12sp" android:layout_marginTop="5dp"/>
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:orientation="horizontal" android:layout_marginTop="6dp">
-                    <Button android:id="@+id/update_skip_button" android:layout_width="wrap_content" android:layout_height="44dp" android:text="Omitir" android:textColor="@color/secondary_text" android:background="@drawable/rail_item_bg"/>
-                    <Button android:id="@+id/update_install_button" android:layout_width="wrap_content" android:layout_height="44dp" android:layout_marginStart="8dp" android:text="Instalar" android:textColor="@color/primary_text" android:background="@drawable/rail_item_bg"/>
-                </LinearLayout>
-            </LinearLayout>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Instancias recientes" android:textColor="@color/primary_text" android:textSize="17sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Instancias recientes"/> android:textColor="@color/primary_text" android:textSize="17sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp"/>
             <LinearLayout android:id="@+id/recent_instances_container" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@drawable/card_menu_bg" android:layout_marginTop="12dp">
                 <com.kdt.mcgui.LauncherMenuButton android:id="@+id/custom_control_button" style="@style/LauncherMenuButton.Universal" android:layout_width="match_parent" android:drawableStart="@drawable/ic_px_gamepad" android:drawableTint="@color/emerald_accent" android:text="@string/mcl_option_customcontrol"/>
