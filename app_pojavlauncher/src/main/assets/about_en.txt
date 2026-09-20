@@ -1,5 +1,9 @@
-%s (Minecraft Java Launcher for Android), version %s by FranyuLauncher<br>
-
+%s (Minecraft: Java Edition launcher for Android), version %s by FranyuLauncher<br>
+<br>
+FranyuLauncher is an Android launcher for Minecraft: Java Edition. It lets you install, configure, manage, and launch Java Edition instances from a mobile device, with support for touch and controller controls, Java runtimes, rendering options, game directories, and mod installers.<br>
+<br>
+This project is a FranyuLauncher rebrand and development line based on code from the PojavLauncher and MojoLauncher ecosystems. Current work includes the FranyuLauncher visual identity, a redesigned launcher home, recent-instance information, resilient downloads, and an in-app update flow.<br>
+<br>
 * License:<br>
  • This application is licensed under <a href="https://github.com/PojavLauncherTeam/PojavLauncher/blob/master/LICENSE">GNU GPLv3</a>.<br>
  
