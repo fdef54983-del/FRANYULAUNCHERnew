@@ -36,7 +36,20 @@ public final class FranyuPerformanceGuard {
     }
     public static boolean preLaunchCheck(Context c, Instance i, int javaVersion) {
         if(!FranyuFeatureStore.diagnostics(c)) return true;
-        if(i.getGameDirectory().getUsableSpace()<1024L*1024L*1024L){Toast.makeText(c,"Diagnóstico: queda menos de 1 GB libre.",Toast.LENGTH_LONG).show();return false;}
+        if(!Tools.checkStorageRoot(c)){
+            Toast.makeText(c,"Diagnóstico: no se puede acceder al almacenamiento. Concede el permiso e inténtalo de nuevo.",Toast.LENGTH_LONG).show();
+            return false;
+        }
+        File storageProbe=i.getGameDirectory();
+        while(storageProbe!=null && !storageProbe.exists()) storageProbe=storageProbe.getParentFile();
+        if(storageProbe==null || !storageProbe.canRead() || !storageProbe.canWrite()){
+            Toast.makeText(c,"Diagnóstico: la carpeta del juego no está disponible. Revisa el permiso de almacenamiento.",Toast.LENGTH_LONG).show();
+            return false;
+        }
+        long usableSpace=storageProbe.getUsableSpace();
+        // Android may report 0 for a path that does not exist yet or is not
+        // readable. That is an access problem, not proof that the disk is full.
+        if(usableSpace>0 && usableSpace<1024L*1024L*1024L){Toast.makeText(c,"Diagnóstico: queda menos de 1 GB libre.",Toast.LENGTH_LONG).show();return false;}
         if(Tools.getFreeDeviceMemory(c)<384){Toast.makeText(c,"Diagnóstico: hay muy poca RAM libre.",Toast.LENGTH_LONG).show();return false;}
         boolean java=false; try { java=MultiRTUtils.getRuntimes().stream().anyMatch(r->r.javaVersion>=javaVersion); } catch(Throwable ignored) {}
         if(!java){Toast.makeText(c,"Diagnóstico: no hay Java compatible instalado.",Toast.LENGTH_LONG).show();return false;}
