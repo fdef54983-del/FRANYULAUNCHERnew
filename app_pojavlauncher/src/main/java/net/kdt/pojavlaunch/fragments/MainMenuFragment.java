@@ -68,8 +68,6 @@ public class MainMenuFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        Button news = view.findViewById(R.id.news_button);
-        Button discord = view.findViewById(R.id.discord_button);
         Button controls = view.findViewById(R.id.custom_control_button);
         Button installJar = view.findViewById(R.id.install_jar_button);
         Button shareLogs = view.findViewById(R.id.share_logs_button);
@@ -82,8 +80,6 @@ public class MainMenuFragment extends Fragment {
         mRecentInstances = view.findViewById(R.id.recent_instances_container);
         mUpdateChecker = new UpdateChecker(requireContext());
 
-        news.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
-        discord.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.discord_invite)));
         controls.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
         installJar.setOnClickListener(v -> runInstallerWithConfirmation());
         editProfile.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
@@ -97,11 +93,6 @@ public class MainMenuFragment extends Fragment {
         view.findViewById(R.id.rail_mods).setOnClickListener(v -> runInstallerWithConfirmation());
         view.findViewById(R.id.rail_settings).setOnClickListener(v ->
                 Tools.swapFragment(requireActivity(), LauncherPreferenceFragment.class, "SETTINGS_FRAGMENT", null));
-
-        news.setOnLongClickListener(v -> {
-            Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
-            return true;
-        });
 
         refreshSelectedInstance(view);
         renderRecentInstances();
