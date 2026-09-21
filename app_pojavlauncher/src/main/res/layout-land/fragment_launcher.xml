@@ -8,6 +8,11 @@
     </LinearLayout>
     <ScrollView android:id="@+id/main_scroll" android:layout_width="0dp" android:layout_height="0dp" android:fillViewport="true" android:scrollbars="none" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="4dp" android:paddingEnd="4dp" android:paddingTop="4dp" android:paddingBottom="14dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="FRANYULAUNCHER" android:textColor="@color/emerald_accent" android:textSize="12sp" android:textStyle="bold" android:letterSpacing="0.12"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Tu centro de juego, limpio y listo." android:textColor="@color/primary_text" android:textSize="22sp" android:textStyle="bold"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Elige una instancia y comienza a jugar." android:textColor="@color/secondary_text" android:textSize="13sp"/>
+            </LinearLayout>
             <LinearLayout android:id="@+id/active_instance_card" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp" android:background="@drawable/hero_instance_bg">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="INSTANCIA ACTIVA" android:textColor="@color/secondary_text" android:textSize="11sp" android:textStyle="bold"/>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center_vertical" android:orientation="horizontal">
@@ -25,15 +30,13 @@
                 </LinearLayout>
                 <com.kdt.mcgui.mcVersionSpinner android:id="@+id/mc_version_spinner" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone"/>
             </LinearLayout>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Instancias recientes"/> android:textColor="@color/primary_text" android:textSize="17sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Instancias recientes" android:textColor="@color/primary_text" android:textSize="17sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp"/>
             <LinearLayout android:id="@+id/recent_instances_container" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@drawable/card_menu_bg" android:layout_marginTop="12dp">
                 <com.kdt.mcgui.LauncherMenuButton android:id="@+id/custom_control_button" style="@style/LauncherMenuButton.Universal" android:layout_width="match_parent" android:drawableStart="@drawable/ic_px_gamepad" android:drawableTint="@color/emerald_accent" android:text="@string/mcl_option_customcontrol"/>
                 <com.kdt.mcgui.LauncherMenuButton android:id="@+id/install_jar_button" style="@style/LauncherMenuButton.Universal" android:layout_width="match_parent" android:drawableStart="@drawable/ic_px_java_run" android:drawableTint="@color/emerald_accent" android:text="@string/main_install_jar_file"/>
                 <com.kdt.mcgui.LauncherMenuButton android:id="@+id/open_files_button" style="@style/LauncherMenuButton.Universal" android:layout_width="match_parent" android:drawableStart="@drawable/ic_px_folder" android:drawableTint="@color/emerald_accent" android:text="@string/mcl_button_open_directory"/>
                 <com.kdt.mcgui.LauncherMenuButton android:id="@+id/share_logs_button" style="@style/LauncherMenuButton.Universal" android:layout_width="match_parent" android:drawableStart="@drawable/ic_px_sharelog" android:drawableTint="@color/emerald_accent" android:text="@string/main_share_logs"/>
-                <com.kdt.mcgui.LauncherMenuButton android:id="@+id/news_button" style="@style/LauncherMenuButton.Universal" android:layout_width="match_parent" android:drawableStart="@drawable/ic_px_book" android:drawableTint="@color/emerald_accent" android:text="@string/mcl_tab_wiki"/>
-                <com.kdt.mcgui.LauncherMenuButton android:id="@+id/discord_button" style="@style/LauncherMenuButton.Universal" android:layout_width="match_parent" android:drawableStart="@drawable/ic_discord" android:text="@string/mcl_button_discord"/>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
