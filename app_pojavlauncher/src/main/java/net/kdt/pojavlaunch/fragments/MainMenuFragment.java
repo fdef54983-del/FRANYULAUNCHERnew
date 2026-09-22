@@ -73,7 +73,6 @@ public class MainMenuFragment extends Fragment {
         Button shareLogs = view.findViewById(R.id.share_logs_button);
         Button openDirectory = view.findViewById(R.id.open_files_button);
         ImageButton editProfile = view.findViewById(R.id.edit_profile_button);
-        ImageButton railHome = view.findViewById(R.id.rail_home);
         Button play = view.findViewById(R.id.play_button);
 
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
@@ -87,16 +86,8 @@ public class MainMenuFragment extends Fragment {
         shareLogs.setOnClickListener(v -> shareLog(requireContext()));
         openDirectory.setOnClickListener(v -> openGameDirectory(v.getContext()));
 
-        railHome.setSelected(true);
-        railHome.setOnClickListener(v -> v.setSelected(true));
-        view.findViewById(R.id.rail_instances).setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
-        view.findViewById(R.id.rail_mods).setOnClickListener(v -> runInstallerWithConfirmation());
-        view.findViewById(R.id.rail_settings).setOnClickListener(v ->
-                Tools.swapFragment(requireActivity(), LauncherPreferenceFragment.class, "SETTINGS_FRAGMENT", null));
-
         refreshSelectedInstance(view);
         renderRecentInstances();
-        checkForUpdate();
     }
 
     private void launchSelectedInstance() {
@@ -197,82 +188,9 @@ public class MainMenuFragment extends Fragment {
     }
 
     private void checkForUpdate() {
-        mUpdateChecker.check(update -> {
-            if (!isAdded() || update == null || mUpdateDialog != null) return;
-            mLatestUpdate = update;
-            showUpdateDialog(update);
-        });
     }
 
     private void showUpdateDialog(UpdateChecker.Update update) {
-        if (!isAdded()) return;
-
-        int padding = (int) (20 * getResources().getDisplayMetrics().density);
-        LinearLayout root = new LinearLayout(requireContext());
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(padding, padding, padding, padding);
-
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.rgb(22, 25, 29));
-        background.setCornerRadius(22 * getResources().getDisplayMetrics().density);
-        root.setBackground(background);
-
-        TextView title = new TextView(requireContext());
-        title.setText("Nueva actualización");
-        title.setTextColor(Color.rgb(80, 220, 150));
-        title.setTextSize(21);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        root.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView version = new TextView(requireContext());
-        version.setText("FranyuLauncher " + update.version);
-        version.setTextColor(Color.WHITE);
-        version.setTextSize(16);
-        version.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        version.setPadding(0, 6, 0, 12);
-        root.addView(version, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView label = new TextView(requireContext());
-        label.setText("Novedades");
-        label.setTextColor(Color.rgb(210, 215, 220));
-        label.setTextSize(13);
-        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        root.addView(label, new LinearLayout.LayoutParams(-1, -2));
-
-        ScrollView scroll = new ScrollView(requireContext());
-        TextView body = new TextView(requireContext());
-        body.setText(update.body == null ? "" : update.body);
-        body.setTextColor(Color.rgb(190, 195, 200));
-        body.setTextSize(14);
-        body.setLineSpacing(0, 1.12f);
-        body.setPadding(0, 7, 0, 7);
-        scroll.addView(body);
-        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(-1, (int) (280 * getResources().getDisplayMetrics().density));
-        scrollParams.topMargin = 4;
-        scrollParams.bottomMargin = 8;
-        root.addView(scroll, scrollParams);
-
-        AlertDialog dialog = new AlertDialog.Builder(requireContext())
-                .setView(root)
-                .setNegativeButton("Omitir para después", (d, which) -> {
-                    mUpdateChecker.skipVersion(update.version);
-                    mLatestUpdate = null;
-                })
-                .setPositiveButton("Instalar", (d, which) -> {
-                    mUpdateChecker.install(update, requireActivity());
-                    mLatestUpdate = null;
-                })
-                .create();
-
-        dialog.setOnShowListener(d -> {
-            Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            if (positive != null) positive.setTextColor(Color.rgb(80, 220, 150));
-            Button negative = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
-            if (negative != null) negative.setTextColor(Color.rgb(170, 175, 180));
-        });
-        dialog.setOnDismissListener(d -> mUpdateDialog = null);
-        mUpdateDialog = dialog;
-        dialog.show();
     }
 
     private void openGameDirectory(Context context) {
@@ -310,7 +228,6 @@ public class MainMenuFragment extends Fragment {
         if (getView() != null) {
             refreshSelectedInstance(getView());
             renderRecentInstances();
-            checkForUpdate();
         }
     }
 
