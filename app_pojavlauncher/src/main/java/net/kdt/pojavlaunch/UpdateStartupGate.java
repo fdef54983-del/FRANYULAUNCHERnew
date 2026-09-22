@@ -1,10 +1,11 @@
 package net.kdt.pojavlaunch;
 
 import android.app.Activity;
-import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,17 +13,13 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import net.kdt.pojavlaunch.fragments.UpdateChecker;
 
-/**
- * Blocks the launcher UI briefly while the public GitHub release is checked.
- * The launcher continues normally when there is no newer release or the
- * network request fails. When a newer release exists, the user gets a single
- * floating update panel with the release notes and explicit actions.
- */
 public final class UpdateStartupGate implements AutoCloseable {
+    private static final long MIN_LOADING_MS = 550L;
     private static final int EMERALD = Color.rgb(31, 174, 118);
     private static final int DARK = Color.rgb(10, 18, 14);
     private static final int PANEL = Color.rgb(20, 31, 25);
@@ -31,7 +28,9 @@ public final class UpdateStartupGate implements AutoCloseable {
 
     private final Activity activity;
     private final UpdateChecker checker;
+    private final Handler main = new Handler(Looper.getMainLooper());
     private FrameLayout overlay;
+    private long loadingStartedAt;
     private boolean finished;
     private boolean closed;
 
@@ -42,14 +41,18 @@ public final class UpdateStartupGate implements AutoCloseable {
 
     public void start(Runnable continueToLauncher) {
         if (closed || activity.isFinishing()) return;
+        loadingStartedAt = android.os.SystemClock.uptimeMillis();
         showLoading();
         checker.check(update -> {
             if (closed || activity.isFinishing()) return;
-            if (update == null) {
-                finish(continueToLauncher);
-            } else {
-                showUpdate(update, continueToLauncher);
-            }
+            long remaining = MIN_LOADING_MS - (android.os.SystemClock.uptimeMillis() - loadingStartedAt);
+            if (remaining < 0) remaining = 0;
+            final long delay = remaining;
+            main.postDelayed(() -> {
+                if (closed || activity.isFinishing()) return;
+                if (update == null) finish(continueToLauncher);
+                else showUpdate(update, continueToLauncher);
+            }, delay);
         });
     }
 
@@ -108,7 +111,6 @@ public final class UpdateStartupGate implements AutoCloseable {
 
         TextView title = text("Nueva actualización", 22, TEXT, Typeface.BOLD);
         panel.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
         TextView version = text("FranyuLauncher " + update.version, 15, EMERALD, Typeface.BOLD);
         LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(-1, -2);
         versionParams.topMargin = dp(5);
@@ -119,7 +121,7 @@ public final class UpdateStartupGate implements AutoCloseable {
         labelParams.topMargin = dp(18);
         panel.addView(label, labelParams);
 
-        android.widget.ScrollView notesScroll = new android.widget.ScrollView(activity);
+        ScrollView notesScroll = new ScrollView(activity);
         TextView notes = text(cleanBody(update.body), 14, TEXT, Typeface.NORMAL);
         notes.setLineSpacing(0, 1.12f);
         notes.setPadding(0, dp(7), 0, dp(7));
@@ -190,6 +192,7 @@ public final class UpdateStartupGate implements AutoCloseable {
         ViewGroup content = activity.findViewById(android.R.id.content);
         if (content != null && overlay != null && overlay.getParent() == null) {
             content.addView(overlay, new ViewGroup.LayoutParams(-1, -1));
+            overlay.bringToFront();
         }
     }
 
@@ -215,6 +218,7 @@ public final class UpdateStartupGate implements AutoCloseable {
     @Override
     public void close() {
         closed = true;
+        main.removeCallbacksAndMessages(null);
         checker.close();
         removeOverlay();
     }
