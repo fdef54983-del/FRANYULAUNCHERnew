@@ -34,7 +34,6 @@ public class UpdateChecker implements AutoCloseable {
     private static final String RELEASES_URL =
             "https://api.github.com/repos/fdef54983-del/FRANYULAUNCHERnew/releases/latest";
     private static final String PREFS = "franyu_updates";
-    private static final String KEY_CHECK = "last_check";
     private static final String KEY_SKIPPED = "skipped_version";
     private static final String KEY_PENDING_APK = "pending_apk";
     private final Context context;
@@ -68,10 +67,10 @@ public class UpdateChecker implements AutoCloseable {
             HttpURLConnection connection = null;
             try {
                 connection = (HttpURLConnection) new URL(RELEASES_URL).openConnection();
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(15000);
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(12000);
                 connection.setRequestProperty("Accept", "application/vnd.github+json");
-                connection.setRequestProperty("User-Agent", "FranyuLauncher");
+                connection.setRequestProperty("User-Agent", "FranyuLauncher/1.3");
                 if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
                     StringBuilder json = new StringBuilder();
                     try (InputStream in = connection.getInputStream()) {
@@ -88,18 +87,7 @@ public class UpdateChecker implements AutoCloseable {
                     String skipped = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                             .getString(KEY_SKIPPED, "");
                     if (isNewer(version, installed) && !version.equals(skipped)) {
-                        String apk = null;
-                        if (release.has("assets")) {
-                            JsonArray assets = release.getAsJsonArray("assets");
-                            for (int i = 0; i < assets.size(); i++) {
-                                JsonObject asset = assets.get(i).getAsJsonObject();
-                                String name = asset.get("name").getAsString().toLowerCase();
-                                if (name.equals("franyulauncher-1.3.apk")) {
-                                    apk = asset.get("browser_download_url").getAsString();
-                                    break;
-                                }
-                            }
-                        }
+                        String apk = findCompatibleApk(release);
                         if (apk != null) {
                             update = new Update(version,
                                     release.has("body") ? release.get("body").getAsString() : "", apk);
@@ -117,6 +105,26 @@ public class UpdateChecker implements AutoCloseable {
                 });
             }
         });
+    }
+
+    private String findCompatibleApk(JsonObject release) {
+        if (!release.has("assets") || !release.get("assets").isJsonArray()) return null;
+        JsonArray assets = release.getAsJsonArray("assets");
+        String fallback = null;
+        for (int i = 0; i < assets.size(); i++) {
+            JsonObject asset = assets.get(i).getAsJsonObject();
+            if (!asset.has("name") || !asset.has("browser_download_url")) continue;
+            String name = asset.get("name").getAsString();
+            String lower = name.toLowerCase();
+            if (!lower.endsWith(".apk")) continue;
+            if (lower.contains("noruntime")) continue;
+            String url = asset.get("browser_download_url").getAsString();
+            if (lower.equals("franyulauncher-" + BuildConfig.VERSION_NAME.toLowerCase() + ".apk")) {
+                return url;
+            }
+            if (fallback == null) fallback = url;
+        }
+        return fallback;
     }
 
     private static boolean isNewer(String remote, String installed) {
@@ -167,7 +175,7 @@ public class UpdateChecker implements AutoCloseable {
                 main.post(() -> launchInstaller(activity, apk));
             } catch (Exception e) {
                 if (!closed) main.post(() -> Toast.makeText(activity,
-                        "No se puede instalar esta actualización. Comprueba que la APK sea compatible con tu instalación actual.",
+                        "No se puede instalar la actualización. Comprueba la conexión y que la APK corresponda a FranyuLauncher.",
                         Toast.LENGTH_LONG).show());
             }
         });
@@ -177,12 +185,10 @@ public class UpdateChecker implements AutoCloseable {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(60000);
-        connection.setRequestProperty("User-Agent", "FranyuLauncher");
+        connection.setRequestProperty("User-Agent", "FranyuLauncher/1.3");
         connection.setInstanceFollowRedirects(true);
         int response = connection.getResponseCode();
-        if (response != HttpURLConnection.HTTP_OK) {
-            throw new java.io.IOException("HTTP " + response);
-        }
+        if (response != HttpURLConnection.HTTP_OK) throw new java.io.IOException("HTTP " + response);
         try (InputStream in = connection.getInputStream();
              FileOutputStream out = new FileOutputStream(destination, false)) {
             byte[] buffer = new byte[32768];
@@ -238,7 +244,6 @@ public class UpdateChecker implements AutoCloseable {
             activity.startActivity(settings);
             return;
         }
-
         Uri uri = FileProvider.getUriForFile(context,
                 context.getPackageName() + ".updateprovider", apk);
         Intent installIntent = new Intent(Intent.ACTION_INSTALL_PACKAGE);
@@ -246,7 +251,6 @@ public class UpdateChecker implements AutoCloseable {
         installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         installIntent.setClipData(ClipData.newRawUri("FranyuLauncher APK", uri));
-
         try {
             activity.startActivity(installIntent);
             clearPendingInstall();
@@ -258,7 +262,6 @@ public class UpdateChecker implements AutoCloseable {
                     Toast.LENGTH_LONG).show();
             return;
         }
-
         Intent viewIntent = new Intent(Intent.ACTION_VIEW);
         viewIntent.setDataAndType(uri, "application/vnd.android.package-archive");
         viewIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
