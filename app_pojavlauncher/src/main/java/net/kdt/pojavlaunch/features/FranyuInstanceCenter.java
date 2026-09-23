@@ -21,7 +21,7 @@ public final class FranyuInstanceCenter {
         return new ArrayList<>(instances.subList(0, limit));
     }
 
-    public static int modCount(Instance instance) {
+    public static List<Instance> allInstances() {\n        return new ArrayList<>(InstanceManager.getImmutableInstanceList());\n    }\n\n    public static int modCount(Instance instance) {
         if (instance == null) return 0;
         File mods = new File(instance.getGameDirectory(), "mods");
         File[] files = mods.isDirectory()
