@@ -6,6 +6,8 @@ import android.os.Build;
 import android.os.Debug;
 import android.widget.Toast;
 
+import java.io.File;
+
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.utils.MCOptionUtils;
