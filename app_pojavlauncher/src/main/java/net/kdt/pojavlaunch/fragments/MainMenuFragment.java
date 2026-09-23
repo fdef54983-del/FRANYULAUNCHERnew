@@ -36,6 +36,7 @@ import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceIconProvider;
 import net.kdt.pojavlaunch.instances.InstanceManager;
+import net.kdt.pojavlaunch.features.FranyuInstanceCenter;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.utils.FileUtils;
@@ -53,9 +54,6 @@ public class MainMenuFragment extends Fragment {
 
     private mcVersionSpinner mVersionSpinner;
     private LinearLayout mRecentInstances;
-    private AlertDialog mUpdateDialog;
-    private UpdateChecker mUpdateChecker;
-    private UpdateChecker.Update mLatestUpdate;
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
             registerForActivityResult(new OpenDocumentWithExtension("jar"), (data) -> {
@@ -77,7 +75,6 @@ public class MainMenuFragment extends Fragment {
 
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
         mRecentInstances = view.findViewById(R.id.recent_instances_container);
-        mUpdateChecker = new UpdateChecker(requireContext());
 
         controls.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
         installJar.setOnClickListener(v -> runInstallerWithConfirmation());
@@ -113,7 +110,7 @@ public class MainMenuFragment extends Fragment {
         if (instanceName == null) instanceName = safeVersion(instance.versionId);
         name.setText(instanceName);
         details.setText(safeVersion(instance.versionId) + " • " + detectModLoader(instance));
-        mods.setText("Mods: " + countMods(instance));
+        mods.setText("Mods: " + FranyuInstanceCenter.modCount(instance));
         android.widget.ImageView icon = root.findViewById(R.id.active_instance_icon);
         android.graphics.drawable.Drawable instanceIcon = InstanceIconProvider.fetchIcon(getResources(), instance);
         if (instanceIcon != null) icon.setImageDrawable(instanceIcon);
@@ -147,19 +144,11 @@ public class MainMenuFragment extends Fragment {
         return "Vanilla";
     }
 
-    private int countMods(Instance instance) {
-        File mods = new File(instance.getGameDirectory(), "mods");
-        File[] files = mods.isDirectory() ? mods.listFiles((dir, name) ->
-                name != null && (name.toLowerCase().endsWith(".jar") || name.toLowerCase().endsWith(".zip"))) : null;
-        return files == null ? 0 : files.length;
-    }
-
     private void renderRecentInstances() {
         if (mRecentInstances == null) return;
         mRecentInstances.removeAllViews();
-        List<Instance> instances = new ArrayList<>(InstanceManager.getImmutableInstanceList());
-        Collections.sort(instances, Comparator.comparingLong((Instance i) -> i.lastPlayedAt).reversed());
-        int shown = Math.min(5, instances.size());
+        List<Instance> instances = FranyuInstanceCenter.recentInstances(5);
+        int shown = instances.size();
         for (int index = 0; index < shown; index++) {
             Instance instance = instances.get(index);
             TextView item = new TextView(requireContext());
@@ -187,12 +176,6 @@ public class MainMenuFragment extends Fragment {
         }
     }
 
-    private void checkForUpdate() {
-    }
-
-    private void showUpdateDialog(UpdateChecker.Update update) {
-    }
-
     private void openGameDirectory(Context context) {
         Instance selected = InstanceManager.getSelectedListedInstance();
         if (selected == null) {
@@ -209,14 +192,6 @@ public class MainMenuFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
-        if (mUpdateDialog != null) {
-            mUpdateDialog.dismiss();
-            mUpdateDialog = null;
-        }
-        if (mUpdateChecker != null) {
-            mUpdateChecker.close();
-            mUpdateChecker = null;
-        }
         super.onDestroyView();
     }
 
@@ -224,7 +199,6 @@ public class MainMenuFragment extends Fragment {
     public void onResume() {
         super.onResume();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
-        if (mUpdateChecker != null) mUpdateChecker.resumePendingInstall(requireActivity());
         if (getView() != null) {
             refreshSelectedInstance(getView());
             renderRecentInstances();
