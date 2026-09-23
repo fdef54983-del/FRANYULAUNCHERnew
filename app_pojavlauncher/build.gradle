@@ -7,12 +7,12 @@ apply from: rootProject.file('gradle/prefab_bypass.gradle')
 import de.undercouch.gradle.tasks.download.Download
 static def getDate() { return new Date().format('yyyyMMdd') }
 static def getDateSeconds() {
-    // Keep CI APKs newer than older local builds while staying below Android's 2.1B limit.
-    // YYYYMMDD * 100 + CI run number gives a monotonically increasing release code.
+    // Stable, increasing CI versionCode without exceeding Android's 2.1B limit.
+    // Days since Unix epoch keep the value compact; the CI run provides ordering within a day.
     if (System.getenv("GITHUB_ACTIONS") == "true") {
+        long days = (System.currentTimeMillis() / 86400000L)
         int run = Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER"))
-        int dateCode = Integer.parseInt(new Date().format("yyyyMMdd"))
-        return dateCode * 100 + (run % 100)
+        return (int) (days * 10000L + (run % 10000))
     }
     String ciCode = System.getenv("FRANYU_VERSION_CODE")
     if (ciCode != null && ciCode.isInteger()) return Integer.parseInt(ciCode)
