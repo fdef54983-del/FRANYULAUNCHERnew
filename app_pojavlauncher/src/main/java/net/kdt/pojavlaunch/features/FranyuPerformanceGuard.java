@@ -8,10 +8,8 @@ import android.widget.Toast;
 
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.instances.Instance;
-import net.kdt.pojavlaunch.multirt.MultiRTUtils;
 import net.kdt.pojavlaunch.utils.MCOptionUtils;
 
-import java.io.File;
 
 public final class FranyuPerformanceGuard {
     public static final class State {
@@ -36,23 +34,27 @@ public final class FranyuPerformanceGuard {
     }
     public static boolean preLaunchCheck(Context c, Instance i, int javaVersion) {
         if(!FranyuFeatureStore.diagnostics(c)) return true;
-        if(!Tools.checkStorageRoot(c)){
+        FranyuDiagnosticsCenter.Result result = FranyuDiagnosticsCenter.inspect(c, i, javaVersion);
+        if(!result.storageAccessible){
             Toast.makeText(c,"Diagnóstico: no se puede acceder al almacenamiento. Concede el permiso e inténtalo de nuevo.",Toast.LENGTH_LONG).show();
             return false;
         }
-        File storageProbe=i.getGameDirectory();
-        while(storageProbe!=null && !storageProbe.exists()) storageProbe=storageProbe.getParentFile();
-        if(storageProbe==null || !storageProbe.canRead() || !storageProbe.canWrite()){
+        if(!result.instanceAccessible){
             Toast.makeText(c,"Diagnóstico: la carpeta del juego no está disponible. Revisa el permiso de almacenamiento.",Toast.LENGTH_LONG).show();
             return false;
         }
-        long usableSpace=storageProbe.getUsableSpace();
-        // Android may report 0 for a path that does not exist yet or is not
-        // readable. That is an access problem, not proof that the disk is full.
-        if(usableSpace>0 && usableSpace<1024L*1024L*1024L){Toast.makeText(c,"Diagnóstico: queda menos de 1 GB libre.",Toast.LENGTH_LONG).show();return false;}
-        if(Tools.getFreeDeviceMemory(c)<384){Toast.makeText(c,"Diagnóstico: hay muy poca RAM libre.",Toast.LENGTH_LONG).show();return false;}
-        boolean java=false; try { java=MultiRTUtils.getRuntimes().stream().anyMatch(r->r.javaVersion>=javaVersion); } catch(Throwable ignored) {}
-        if(!java){Toast.makeText(c,"Diagnóstico: no hay Java compatible instalado.",Toast.LENGTH_LONG).show();return false;}
+        if(result.usableBytes>0 && result.usableBytes<1024L*1024L*1024L){
+            Toast.makeText(c,"Diagnóstico: queda menos de 1 GB libre.",Toast.LENGTH_LONG).show();
+            return false;
+        }
+        if(result.freeRamMb<384){
+            Toast.makeText(c,"Diagnóstico: hay muy poca RAM libre.",Toast.LENGTH_LONG).show();
+            return false;
+        }
+        if(!result.compatibleJavaInstalled){
+            Toast.makeText(c,"Diagnóstico: no hay Java compatible instalado.",Toast.LENGTH_LONG).show();
+            return false;
+        }
         return true;
     }
     public static String applySafeProfile(Context c, Instance i) {
