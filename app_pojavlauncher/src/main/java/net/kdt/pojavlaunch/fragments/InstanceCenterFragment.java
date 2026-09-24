@@ -77,7 +77,7 @@ public class InstanceCenterFragment extends Fragment {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(16, 12, 12, 12);
         row.setMinimumHeight(82);
-        row.setBackgroundResource(selected ? R.drawable.hero_instance_bg : R.drawable.recent_instance_bg);
+        row.setBackgroundResource(R.drawable.card_menu_bg);
 
         ImageView icon = new ImageView(requireContext());
         icon.setLayoutParams(new LinearLayout.LayoutParams(56, 56));
