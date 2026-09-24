@@ -71,7 +71,8 @@ public class MainMenuFragment extends Fragment {
         Button shareLogs = view.findViewById(R.id.share_logs_button);
         Button openDirectory = view.findViewById(R.id.open_files_button);
         ImageButton editProfile = view.findViewById(R.id.edit_profile_button);
-        Button play = view.findViewById(R.id.play_button);\n        View instanceCenter = view.findViewById(R.id.instances_center_button);
+        Button play = view.findViewById(R.id.play_button);
+        View instanceCenter = view.findViewById(R.id.instances_center_button);
 
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
         mRecentInstances = view.findViewById(R.id.recent_instances_container);
@@ -79,7 +80,8 @@ public class MainMenuFragment extends Fragment {
         controls.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
         installJar.setOnClickListener(v -> runInstallerWithConfirmation());
         editProfile.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
-        play.setOnClickListener(v -> launchSelectedInstance());\n        instanceCenter.setOnClickListener(v -> Tools.swapFragment(requireActivity(), InstanceCenterFragment.class, InstanceCenterFragment.TAG, null));
+        play.setOnClickListener(v -> launchSelectedInstance());
+        instanceCenter.setOnClickListener(v -> Tools.swapFragment(requireActivity(), InstanceCenterFragment.class, InstanceCenterFragment.TAG, null));
         shareLogs.setOnClickListener(v -> shareLog(requireContext()));
         openDirectory.setOnClickListener(v -> openGameDirectory(v.getContext()));
 
@@ -161,11 +163,12 @@ public class MainMenuFragment extends Fragment {
             if (name == null) name = safeVersion(instance.versionId);
             String when = instance.lastPlayedAt <= 0 ? "Never played"
                     : DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(instance.lastPlayedAt));
-            item.setText(name + "\n" + when);
+            item.setText(name + "
+" + when);
             item.setCompoundDrawablesRelativeWithIntrinsicBounds(
                     InstanceIconProvider.fetchIcon(getResources(), instance), null, null, null);
             item.setCompoundDrawablePadding(14);
-            item.setBackgroundResource(R.drawable.recent_instance_bg);
+            item.setBackgroundResource(R.drawable.card_menu_bg);
             item.setOnClickListener(v -> {
                 InstanceManager.setSelectedInstance(instance);
                 mVersionSpinner.reloadProfiles();
