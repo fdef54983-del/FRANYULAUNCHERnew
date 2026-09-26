@@ -32,13 +32,29 @@ def getVersionName = {
 }
 def getCFApiKey = { String key=System.getenv("CURSEFORGE_API_KEY"); if(key!=null)return key; File f=new File("./curseforge_key.txt"); if(f.canRead()&&f.isFile())return f.text; logger.warn('BUILD: You have no CurseForge key, the curseforge api will get disabled !'); return "DUMMY" }
 configurations { instrumentedClasspath { canBeConsumed=false; canBeResolved=true } }
+File rootKeystore = rootProject.file("debug.keystore")
+File appKeystore = file("debug.keystore")
+if (!rootKeystore.exists() && !appKeystore.exists()) {
+    File base64File = rootProject.file("debug.keystore.base64")
+    if (base64File.exists()) {
+        try {
+            rootKeystore.bytes = base64File.text.trim().decodeBase64()
+        } catch (Exception ignored) {}
+    }
+}
+if (!rootKeystore.exists() && !appKeystore.exists()) {
+    try {
+        ["keytool", "-genkey", "-v", "-keystore", rootKeystore.absolutePath, "-storepass", "android", "-alias", "androiddebugkey", "-keypass", "android", "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000", "-dname", "CN=Android Debug,O=Android,C=US"].execute().waitFor()
+    } catch (Exception ignored) {}
+}
+
 android {
  namespace 'git.artdeell.mojo'
  compileSdk=36
  lintOptions{abortOnError false}
  signingConfigs {
   customDebug {
-   storeFile(rootProject.file("debug.keystore").exists() ? rootProject.file("debug.keystore") : file("debug.keystore"))
+   storeFile(rootKeystore.exists() ? rootKeystore : (appKeystore.exists() ? appKeystore : rootKeystore))
    storePassword "android"
    keyAlias "androiddebugkey"
    keyPassword "android"
