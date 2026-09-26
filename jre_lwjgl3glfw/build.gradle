@@ -4,14 +4,13 @@ plugins {
 
 group = 'org.lwjgl.glfw'
 
-configurations.default.setCanBeResolved(true)
+def lwjglConfig = configurations.findByName("runtimeClasspath") ?: configurations.default
 
 jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     archiveBaseName = "lwjgl-glfw-classes"
     from {
-        configurations.default.collect {
-            println(it.getName())
+        lwjglConfig.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
@@ -21,9 +20,8 @@ jar {
 }
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(8)
-    }
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }
 
 dependencies {

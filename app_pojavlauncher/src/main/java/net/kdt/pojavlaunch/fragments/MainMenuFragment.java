@@ -9,11 +9,11 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -36,7 +36,6 @@ import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceIconProvider;
 import net.kdt.pojavlaunch.instances.InstanceManager;
-import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.utils.FileUtils;
 
@@ -79,12 +78,36 @@ public class MainMenuFragment extends Fragment {
         mRecentInstances = view.findViewById(R.id.recent_instances_container);
         mUpdateChecker = new UpdateChecker(requireContext());
 
-        controls.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
-        installJar.setOnClickListener(v -> runInstallerWithConfirmation());
-        editProfile.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
-        play.setOnClickListener(v -> launchSelectedInstance());
-        shareLogs.setOnClickListener(v -> shareLog(requireContext()));
-        openDirectory.setOnClickListener(v -> openGameDirectory(v.getContext()));
+        controls.setOnClickListener(v -> {
+            v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+            startActivity(new Intent(requireContext(), CustomControlsActivity.class));
+        });
+        installJar.setOnClickListener(v -> {
+            v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+            runInstallerWithConfirmation();
+        });
+        editProfile.setOnClickListener(v -> {
+            v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+            mVersionSpinner.openProfileEditor(requireActivity());
+        });
+        play.setOnClickListener(v -> {
+            v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+            launchSelectedInstance();
+        });
+        shareLogs.setOnClickListener(v -> {
+            v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+            shareLog(requireContext());
+        });
+        openDirectory.setOnClickListener(v -> {
+            v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+            openGameDirectory(v.getContext());
+        });
+
+        View heroCard = view.findViewById(R.id.active_instance_card);
+        if (heroCard != null) {
+            Animation anim = AnimationUtils.loadAnimation(requireContext(), R.anim.slide_in_bottom);
+            heroCard.startAnimation(anim);
+        }
 
         refreshSelectedInstance(view);
         renderRecentInstances();
@@ -114,7 +137,7 @@ public class MainMenuFragment extends Fragment {
         name.setText(instanceName);
         details.setText(safeVersion(instance.versionId) + " • " + detectModLoader(instance));
         mods.setText("Mods: " + countMods(instance));
-        android.widget.ImageView icon = root.findViewById(R.id.active_instance_icon);
+        ImageView icon = root.findViewById(R.id.active_instance_icon);
         android.graphics.drawable.Drawable instanceIcon = InstanceIconProvider.fetchIcon(getResources(), instance);
         if (instanceIcon != null) icon.setImageDrawable(instanceIcon);
     }
@@ -163,21 +186,27 @@ public class MainMenuFragment extends Fragment {
         for (int index = 0; index < shown; index++) {
             Instance instance = instances.get(index);
             TextView item = new TextView(requireContext());
-            item.setMinHeight(68);
+            item.setMinHeight(120);
             item.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            item.setPadding(16, 8, 16, 8);
+            item.setPadding(24, 18, 24, 18);
             item.setTextColor(ContextCompat.getColor(requireContext(), R.color.primary_text));
             item.setTextSize(14);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, 4, 0, 8);
+            item.setLayoutParams(lp);
+
             String name = Tools.validOrNullString(instance.name);
             if (name == null) name = safeVersion(instance.versionId);
-            String when = instance.lastPlayedAt <= 0 ? "Never played"
+            String when = instance.lastPlayedAt <= 0 ? "Nunca jugado"
                     : DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(instance.lastPlayedAt));
             item.setText(name + "\n" + when);
             item.setCompoundDrawablesRelativeWithIntrinsicBounds(
                     InstanceIconProvider.fetchIcon(getResources(), instance), null, null, null);
-            item.setCompoundDrawablePadding(14);
+            item.setCompoundDrawablePadding(20);
             item.setBackgroundResource(R.drawable.recent_instance_bg);
             item.setOnClickListener(v -> {
+                v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
                 InstanceManager.setSelectedInstance(instance);
                 mVersionSpinner.reloadProfiles();
                 refreshSelectedInstance(requireView());

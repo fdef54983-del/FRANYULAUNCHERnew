@@ -207,6 +207,16 @@ public class GameRunner {
 
         javaArgList.addAll(getMinecraftJVMArgs(versionId));
 
+        // FranyuLauncher High-Performance Engine Flags
+        javaArgList.add("-XX:+UseG1GC");
+        javaArgList.add("-XX:+ParallelRefProcEnabled");
+        javaArgList.add("-XX:MaxGCPauseMillis=20");
+        javaArgList.add("-XX:+UnlockExperimentalVMOptions");
+        javaArgList.add("-XX:+AlwaysPreTouch");
+        javaArgList.add("-XX:G1NewSizePercent=20");
+        javaArgList.add("-XX:G1ReservePercent=15");
+        javaArgList.add("-XX:InitiatingHeapOccupancyPercent=45");
+
         javaArgList.addAll(JREUtils.parseJavaArguments(instance.getLaunchArgs()));
 
         JREUtils.setEnviroimentForGame(activity, rendererName);
