@@ -252,10 +252,10 @@ public class MainMenuFragment extends Fragment {
         if (getContext() == null || getActivity() == null) return;
 
         Context ctx = requireContext();
-        int emerald = Color.rgb(53, 201, 111);
-        int dark = Color.rgb(17, 27, 21);
-        int text = Color.rgb(241, 247, 242);
-        int muted = Color.rgb(166, 184, 170);
+        int emerald = Color.rgb(16, 185, 129);
+        int dark = Color.rgb(22, 27, 34);
+        int text = Color.rgb(249, 250, 251);
+        int muted = Color.rgb(148, 163, 184);
 
         LinearLayout layout = new LinearLayout(ctx);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -264,7 +264,7 @@ public class MainMenuFragment extends Fragment {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(dark);
         bg.setCornerRadius(dp(18));
-        bg.setStroke(dp(1), Color.rgb(46, 81, 56));
+        bg.setStroke(dp(1), Color.rgb(35, 78, 63));
         layout.setBackground(bg);
 
         TextView title = new TextView(ctx);

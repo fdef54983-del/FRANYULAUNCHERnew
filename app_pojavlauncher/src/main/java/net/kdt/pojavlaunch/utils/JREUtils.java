@@ -111,6 +111,18 @@ public class JREUtils {
         // Fix white color on banner and sheep, since GL4ES 1.1.5
         envMap.put("LIBGL_NORMALIZE", "1");
 
+        // Performance optimizations: Batching draw calls & shader caching (dramatically reduces CPU overhead and stuttering)
+        envMap.put("LIBGL_BATCH", "1");
+        envMap.put("MESA_GLSL_CACHE_DISABLE", "false");
+        envMap.put("MESA_GLSL_CACHE_MAX_SIZE", "256MB");
+
+        if (GLInfoUtils.getGlInfo().isMali()) {
+            // Specific Mali GPU optimizations (Samsung A30, Exynos, Mediatek)
+            envMap.put("LIBGL_STREAM", "1");
+            envMap.put("LIBGL_SHRINK", "1");
+            envMap.put("LIBGL_DEFAULT_WRAP", "1");
+        }
+
         if(PREF_DUMP_SHADERS)
             envMap.put("LIBGL_VGPU_DUMP", "1");
         if(PREF_VSYNC_IN_ZINK)

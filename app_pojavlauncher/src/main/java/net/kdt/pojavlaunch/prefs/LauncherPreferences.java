@@ -14,6 +14,7 @@ import android.util.Log;
 
 import net.kdt.pojavlaunch.*;
 import net.kdt.pojavlaunch.multirt.MultiRTUtils;
+import net.kdt.pojavlaunch.utils.GLInfoUtils;
 import net.kdt.pojavlaunch.utils.JREUtils;
 
 import java.io.IOException;
@@ -88,10 +89,15 @@ public class LauncherPreferences {
         PREF_DISABLE_GESTURES = DEFAULT_PREF.getBoolean("disableGestures",false);
         PREF_DISABLE_SWAP_HAND = DEFAULT_PREF.getBoolean("disableDoubleTap", false);
         PREF_RAM_ALLOCATION = DEFAULT_PREF.getInt("allocation", findBestRAMAllocation(ctx));
-        PREF_CUSTOM_JAVA_ARGS = DEFAULT_PREF.getString("javaArgs", "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=150 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch");
+        final String DEFAULT_OPTIMIZED_JAVA_ARGS = "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=20 -XX:G1MaxNewSizePercent=35 -XX:G1ReservePercent=15 -XX:InitiatingHeapOccupancyPercent=45 -XX:G1MixedGCCountTarget=4 -XX:G1PeriodicGCInterval=0 -Dsun.rmi.dgc.server.gcInterval=2147483646";
+        PREF_CUSTOM_JAVA_ARGS = DEFAULT_PREF.getString("javaArgs", DEFAULT_OPTIMIZED_JAVA_ARGS);
+        if (PREF_CUSTOM_JAVA_ARGS.contains("MaxGCPauseMillis=150") || PREF_CUSTOM_JAVA_ARGS.contains("AlwaysPreTouch")) {
+            PREF_CUSTOM_JAVA_ARGS = DEFAULT_OPTIMIZED_JAVA_ARGS;
+            DEFAULT_PREF.edit().putString("javaArgs", PREF_CUSTOM_JAVA_ARGS).apply();
+        }
         PREF_SUSTAINED_PERFORMANCE = DEFAULT_PREF.getBoolean("sustainedPerformance", true);
         PREF_VIRTUAL_MOUSE_START = DEFAULT_PREF.getBoolean("mouse_start", false);
-        PREF_USE_ALTERNATE_SURFACE = DEFAULT_PREF.getBoolean("alternate_surface", isDevicePowerful);
+        PREF_USE_ALTERNATE_SURFACE = DEFAULT_PREF.getBoolean("alternate_surface", true);
         PREF_JAVA_SANDBOX = DEFAULT_PREF.getBoolean("java_sandbox", true);
         PREF_SCALE_FACTOR = DEFAULT_PREF.getInt("resolutionRatio", findBestResolution(ctx, isDevicePowerful))/100f;
         PREF_ENABLE_GYRO = DEFAULT_PREF.getBoolean("enableGyro", false);
@@ -164,7 +170,19 @@ public class LauncherPreferences {
     private static int findBestResolution(Context context, boolean isDevicePowerful) {
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         int minSide = Math.min(metrics.widthPixels, metrics.heightPixels);
-        int targetSide = isDevicePowerful ? 1080 : 720;
+        boolean isMali = false;
+        try {
+            isMali = GLInfoUtils.getGlInfo().isMali();
+        } catch (Throwable ignored) {}
+        int targetSide;
+        if (isDevicePowerful) {
+            targetSide = 1080;
+        } else if (isMali || Tools.getTotalDeviceMemory(context) <= 4096) {
+            // Samsung A30 / Mali / low-end: 640p render scale boosts FPS drastically without losing UI readability
+            targetSide = 640;
+        } else {
+            targetSide = 720;
+        }
         if (minSide <= targetSide) return 100; // No need to scale down
 
         float ratio = (100f * targetSide / minSide);

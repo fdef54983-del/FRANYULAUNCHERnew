@@ -24,8 +24,8 @@ def getVersionName = {
         def currentBranch = grgit.branch.current()
         def latestCommit = grgit.log(maxCommits: 1)
         def dateToday = getDate()
-        if (currentBranch == null || latestCommit == null) return "LOCAL-${dateToday}"
-        return "1.3-${dateToday}-${latestCommit.abbreviatedId}-${currentBranch.getName()}"
+        if (currentBranch == null || latestCommit == null) return "1.4-${dateToday}"
+        return "1.4-${dateToday}-${latestCommit.abbreviatedId}-${currentBranch.getName()}"
     } catch (Exception ignored) {
         return "LOCAL-${getDate()}"
     }

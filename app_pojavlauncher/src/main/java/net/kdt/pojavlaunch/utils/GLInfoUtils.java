@@ -161,7 +161,16 @@ public class GLInfoUtils {
          * @return
          */
         public boolean isAdreno() {
-            return renderer.contains("Adreno") && vendor.equals("Qualcomm");
+            return renderer != null && renderer.contains("Adreno") && "Qualcomm".equals(vendor);
+        }
+
+        /**
+         * Check if this GLInfo belongs to an ARM Mali graphics adapter
+         * @return
+         */
+        public boolean isMali() {
+            return (renderer != null && renderer.toLowerCase().contains("mali")) ||
+                   (vendor != null && vendor.toLowerCase().contains("arm"));
         }
     }
 }
