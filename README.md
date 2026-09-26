@@ -1,7 +1,7 @@
 # 🚀 FranyuLauncher
 
 <div align="center">
-  <img src="app_pojavlauncher/src/main/assets/pojavlauncher.png" width="128" height="128" alt="FranyuLauncher Logo" />
+  <img src="app_pojavlauncher/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" alt="FranyuLauncher Logo" />
   
   ### *El lanzador definitivo de Minecraft: Java Edition para Android.*
   

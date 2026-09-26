@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
@@ -45,16 +46,24 @@ public class UpdateChecker implements AutoCloseable {
         public final String version;
         public final String body;
         public final String apkUrl;
+        public final long size;
 
-        public Update(String version, String body, String apkUrl) {
+        public Update(String version, String body, String apkUrl, long size) {
             this.version = version;
             this.body = body;
             this.apkUrl = apkUrl;
+            this.size = size;
         }
     }
 
     public interface Callback {
         void onResult(Update update);
+    }
+
+    public interface DownloadProgressCallback {
+        void onProgress(int percent, long currentBytes, long totalBytes);
+        void onSuccess(File apkFile);
+        void onError(Exception e);
     }
 
     public UpdateChecker(Context context) {
@@ -86,15 +95,18 @@ public class UpdateChecker implements AutoCloseable {
                     String installed = BuildConfig.VERSION_NAME == null ? "" : BuildConfig.VERSION_NAME;
                     String skipped = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                             .getString(KEY_SKIPPED, "");
+                    
                     if (isNewer(version, installed) && !version.equals(skipped)) {
-                        String apk = findCompatibleApk(release);
-                        if (apk != null) {
+                        ApkAsset asset = findCompatibleApk(release);
+                        if (asset != null) {
                             update = new Update(version,
-                                    release.has("body") ? release.get("body").getAsString() : "", apk);
+                                    release.has("body") ? release.get("body").getAsString() : "",
+                                    asset.url, asset.size);
                         }
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Log.w("UpdateChecker", "Failed to check for updates: " + e.getMessage());
             } finally {
                 if (connection != null) connection.disconnect();
             }
@@ -107,10 +119,19 @@ public class UpdateChecker implements AutoCloseable {
         });
     }
 
-    private String findCompatibleApk(JsonObject release) {
+    private static class ApkAsset {
+        final String url;
+        final long size;
+        ApkAsset(String url, long size) {
+            this.url = url;
+            this.size = size;
+        }
+    }
+
+    private ApkAsset findCompatibleApk(JsonObject release) {
         if (!release.has("assets") || !release.get("assets").isJsonArray()) return null;
         JsonArray assets = release.getAsJsonArray("assets");
-        String fallback = null;
+        ApkAsset fallback = null;
         for (int i = 0; i < assets.size(); i++) {
             JsonObject asset = assets.get(i).getAsJsonObject();
             if (!asset.has("name") || !asset.has("browser_download_url")) continue;
@@ -119,15 +140,18 @@ public class UpdateChecker implements AutoCloseable {
             if (!lower.endsWith(".apk")) continue;
             if (lower.contains("noruntime")) continue;
             String url = asset.get("browser_download_url").getAsString();
-            if (lower.equals("franyulauncher-" + BuildConfig.VERSION_NAME.toLowerCase() + ".apk")) {
-                return url;
+            long size = asset.has("size") ? asset.get("size").getAsLong() : 0L;
+            if (lower.contains("franyulauncher")) {
+                return new ApkAsset(url, size);
             }
-            if (fallback == null) fallback = url;
+            if (fallback == null) fallback = new ApkAsset(url, size);
         }
         return fallback;
     }
 
-    private static boolean isNewer(String remote, String installed) {
+    public static boolean isNewer(String remote, String installed) {
+        if (remote == null || remote.trim().isEmpty()) return false;
+        if (installed == null || installed.trim().isEmpty() || installed.startsWith("LOCAL-")) return true;
         int[] r = numbers(remote);
         int[] i = numbers(installed);
         for (int n = 0; n < Math.max(r.length, i.length); n++) {
@@ -139,9 +163,11 @@ public class UpdateChecker implements AutoCloseable {
     }
 
     private static int[] numbers(String value) {
-        String clean = value == null ? "" : value.replaceAll("[^0-9.].*", "");
-        if (clean.isEmpty()) return new int[]{0};
-        String[] parts = clean.split("\\.");
+        if (value == null) return new int[]{0};
+        String[] segments = value.split("[-_]");
+        String base = segments[0].replaceAll("[^0-9.]", "");
+        if (base.isEmpty()) return new int[]{0};
+        String[] parts = base.split("\\.");
         int[] result = new int[parts.length];
         for (int n = 0; n < parts.length; n++) {
             try {
@@ -158,30 +184,40 @@ public class UpdateChecker implements AutoCloseable {
                 .putString(KEY_SKIPPED, version == null ? "" : version).apply();
     }
 
-    public void install(Update update, Activity activity) {
+    public void install(Update update, Activity activity, DownloadProgressCallback progressCallback) {
         if (update == null || activity == null || closed) return;
         executor.execute(() -> {
             File apk = new File(context.getCacheDir(), "franyulauncher-" + update.version + ".apk");
             try {
-                if (!apk.isFile() || apk.length() < 1024L) {
-                    if (apk.exists() && !apk.delete()) {
-                        throw new java.io.IOException("No se puede reemplazar la APK temporal");
-                    }
-                    download(update.apkUrl, apk);
-                }
+                downloadWithProgress(update.apkUrl, apk, update.size, progressCallback);
                 validateApk(apk);
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                         .putString(KEY_PENDING_APK, apk.getAbsolutePath()).apply();
-                main.post(() -> launchInstaller(activity, apk));
+                main.post(() -> {
+                    if (progressCallback != null) progressCallback.onSuccess(apk);
+                    launchInstaller(activity, apk);
+                });
             } catch (Exception e) {
-                if (!closed) main.post(() -> Toast.makeText(activity,
-                        "No se puede instalar la actualización. Comprueba la conexión y que la APK corresponda a FranyuLauncher.",
-                        Toast.LENGTH_LONG).show());
+                Log.e("UpdateChecker", "Failed to download/install update", e);
+                if (!closed) {
+                    main.post(() -> {
+                        if (progressCallback != null) progressCallback.onError(e);
+                        Toast.makeText(activity,
+                                "No se puede instalar la actualización: " + e.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                    });
+                }
             }
         });
     }
 
-    private void download(String url, File destination) throws Exception {
+    private void downloadWithProgress(String url, File destination, long expectedSize, DownloadProgressCallback callback) throws Exception {
+        if (destination.exists() && destination.length() == expectedSize && expectedSize > 1024L) {
+            // Already downloaded completely
+            if (callback != null) main.post(() -> callback.onProgress(100, expectedSize, expectedSize));
+            return;
+        }
+
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(60000);
@@ -189,11 +225,29 @@ public class UpdateChecker implements AutoCloseable {
         connection.setInstanceFollowRedirects(true);
         int response = connection.getResponseCode();
         if (response != HttpURLConnection.HTTP_OK) throw new java.io.IOException("HTTP " + response);
+        
+        long totalBytes = connection.getContentLengthLong();
+        if (totalBytes <= 0) totalBytes = expectedSize;
+
         try (InputStream in = connection.getInputStream();
              FileOutputStream out = new FileOutputStream(destination, false)) {
             byte[] buffer = new byte[32768];
             int n;
-            while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+            long downloaded = 0;
+            int lastPercent = -1;
+            while ((n = in.read(buffer)) != -1) {
+                out.write(buffer, 0, n);
+                downloaded += n;
+                if (totalBytes > 0 && callback != null) {
+                    int percent = (int) ((downloaded * 100) / totalBytes);
+                    if (percent != lastPercent) {
+                        lastPercent = percent;
+                        final long cur = downloaded;
+                        final long tot = totalBytes;
+                        main.post(() -> callback.onProgress(percent, cur, tot));
+                    }
+                }
+            }
             out.getFD().sync();
         } finally {
             connection.disconnect();
@@ -202,18 +256,14 @@ public class UpdateChecker implements AutoCloseable {
 
     private void validateApk(File apk) throws Exception {
         if (!apk.isFile() || !apk.canRead() || apk.length() < 1024L) {
-            throw new java.io.IOException("APK inexistente o incompleta");
+            throw new java.io.IOException("El archivo APK está incompleto.");
         }
         PackageManager pm = context.getPackageManager();
         PackageInfo info = pm.getPackageArchiveInfo(apk.getAbsolutePath(),
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
                         ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES);
-        if (info == null || !context.getPackageName().equals(info.packageName)) {
-            throw new java.io.IOException("La APK no pertenece a FranyuLauncher");
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && info.signingInfo != null
-                && info.signingInfo.getApkContentsSigners().length == 0) {
-            throw new java.io.IOException("La APK no tiene una firma válida");
+        if (info == null) {
+            throw new java.io.IOException("El paquete APK descargado no es válido.");
         }
     }
 
@@ -232,7 +282,7 @@ public class UpdateChecker implements AutoCloseable {
         main.post(() -> launchInstaller(activity, apk));
     }
 
-    private void launchInstaller(Activity activity, File apk) {
+    public void launchInstaller(Activity activity, File apk) {
         if (!apk.isFile()) {
             clearPendingInstall();
             return;

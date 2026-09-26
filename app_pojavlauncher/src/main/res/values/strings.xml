@@ -468,4 +468,11 @@
     <string name="vml_err_exists">The VM is already loaded</string>
     <string name="vml_err_inval">Bad arguments</string>
     <string name="gr_err_renderer_load_Failed">Failed to load renderer library</string>
+    <string name="main_mods_addons">Mods &amp; Addons (Modrinth / CurseForge)</string>
+    <string name="main_create_instance">Crear instancia / Versiones optimizadas</string>
+    <string name="update_dialog_title">Nueva actualización disponible</string>
+    <string name="update_dialog_install">Instalar ahora</string>
+    <string name="update_dialog_close">Cerrar</string>
+    <string name="update_dialog_downloading">Descargando actualización (%d%%)...</string>
+    <string name="update_dialog_changelog">Novedades de la versión:</string>
 </resources>

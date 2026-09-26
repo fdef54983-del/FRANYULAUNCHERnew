@@ -6,8 +6,12 @@ import static net.kdt.pojavlaunch.Tools.shareLog;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
@@ -15,6 +19,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -54,7 +59,6 @@ public class MainMenuFragment extends Fragment {
     private LinearLayout mRecentInstances;
     private AlertDialog mUpdateDialog;
     private UpdateChecker mUpdateChecker;
-    private UpdateChecker.Update mLatestUpdate;
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
             registerForActivityResult(new OpenDocumentWithExtension("jar"), (data) -> {
@@ -74,9 +78,26 @@ public class MainMenuFragment extends Fragment {
         ImageButton editProfile = view.findViewById(R.id.edit_profile_button);
         Button play = view.findViewById(R.id.play_button);
 
+        Button createInstance = view.findViewById(R.id.create_instance_button);
+        Button browseMods = view.findViewById(R.id.browse_mods_button);
+
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
         mRecentInstances = view.findViewById(R.id.recent_instances_container);
         mUpdateChecker = new UpdateChecker(requireContext());
+
+        if (createInstance != null) {
+            createInstance.setOnClickListener(v -> {
+                v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+                Tools.swapFragment(requireActivity(), ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG, null);
+            });
+        }
+
+        if (browseMods != null) {
+            browseMods.setOnClickListener(v -> {
+                v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+                Tools.swapFragment(requireActivity(), SearchModFragment.class, SearchModFragment.TAG, null);
+            });
+        }
 
         controls.setOnClickListener(v -> {
             v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
@@ -111,6 +132,7 @@ public class MainMenuFragment extends Fragment {
 
         refreshSelectedInstance(view);
         renderRecentInstances();
+        checkForUpdate();
     }
 
     private void launchSelectedInstance() {
@@ -217,9 +239,157 @@ public class MainMenuFragment extends Fragment {
     }
 
     private void checkForUpdate() {
+        if (mUpdateChecker == null || getActivity() == null || getActivity().isFinishing()) return;
+        mUpdateChecker.check(update -> {
+            if (update != null && isAdded() && getActivity() != null && !getActivity().isFinishing()) {
+                showUpdateDialog(update);
+            }
+        });
     }
 
     private void showUpdateDialog(UpdateChecker.Update update) {
+        if (mUpdateDialog != null && mUpdateDialog.isShowing()) return;
+        if (getContext() == null || getActivity() == null) return;
+
+        Context ctx = requireContext();
+        int emerald = Color.rgb(53, 201, 111);
+        int dark = Color.rgb(17, 27, 21);
+        int text = Color.rgb(241, 247, 242);
+        int muted = Color.rgb(166, 184, 170);
+
+        LinearLayout layout = new LinearLayout(ctx);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(20);
+        layout.setPadding(pad, pad, pad, pad);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(dark);
+        bg.setCornerRadius(dp(18));
+        bg.setStroke(dp(1), Color.rgb(46, 81, 56));
+        layout.setBackground(bg);
+
+        TextView title = new TextView(ctx);
+        title.setText("¡Nueva actualización disponible!");
+        title.setTextSize(18);
+        title.setTextColor(text);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        layout.addView(title);
+
+        TextView version = new TextView(ctx);
+        version.setText("FranyuLauncher " + update.version);
+        version.setTextSize(14);
+        version.setTextColor(emerald);
+        version.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        LinearLayout.LayoutParams vLp = new LinearLayout.LayoutParams(-1, -2);
+        vLp.topMargin = dp(4);
+        layout.addView(version, vLp);
+
+        TextView notesLabel = new TextView(ctx);
+        notesLabel.setText("Novedades:");
+        notesLabel.setTextSize(12);
+        notesLabel.setTextColor(muted);
+        notesLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        LinearLayout.LayoutParams nlLp = new LinearLayout.LayoutParams(-1, -2);
+        nlLp.topMargin = dp(12);
+        layout.addView(notesLabel, nlLp);
+
+        ScrollView scroll = new ScrollView(ctx);
+        TextView notes = new TextView(ctx);
+        notes.setText(update.body == null || update.body.trim().isEmpty() ? "Mejoras de rendimiento y estabilidad." : update.body.trim());
+        notes.setTextSize(13);
+        notes.setTextColor(text);
+        notes.setLineSpacing(0, 1.15f);
+        scroll.addView(notes);
+        LinearLayout.LayoutParams scLp = new LinearLayout.LayoutParams(-1, dp(150));
+        scLp.topMargin = dp(4);
+        layout.addView(scroll, scLp);
+
+        ProgressBar progress = new ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setVisibility(View.GONE);
+        progress.setMax(100);
+        LinearLayout.LayoutParams prLp = new LinearLayout.LayoutParams(-1, dp(16));
+        prLp.topMargin = dp(10);
+        layout.addView(progress, prLp);
+
+        TextView status = new TextView(ctx);
+        status.setVisibility(View.GONE);
+        status.setTextColor(emerald);
+        status.setTextSize(12);
+        status.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams stLp = new LinearLayout.LayoutParams(-1, -2);
+        stLp.topMargin = dp(4);
+        layout.addView(status, stLp);
+
+        LinearLayout buttons = new LinearLayout(ctx);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams btnsLp = new LinearLayout.LayoutParams(-1, -2);
+        btnsLp.topMargin = dp(14);
+
+        Button closeBtn = new Button(ctx);
+        closeBtn.setText("Cerrar");
+        closeBtn.setTextColor(muted);
+        closeBtn.setAllCaps(false);
+
+        Button installBtn = new Button(ctx);
+        installBtn.setText("Instalar");
+        installBtn.setTextColor(Color.WHITE);
+        installBtn.setAllCaps(false);
+        GradientDrawable instBg = new GradientDrawable();
+        instBg.setColor(emerald);
+        instBg.setCornerRadius(dp(12));
+        installBtn.setBackground(instBg);
+
+        LinearLayout.LayoutParams instLp = new LinearLayout.LayoutParams(dp(120), dp(48));
+        instLp.leftMargin = dp(8);
+        buttons.addView(closeBtn, new LinearLayout.LayoutParams(dp(90), dp(48)));
+        buttons.addView(installBtn, instLp);
+        layout.addView(buttons, btnsLp);
+
+        AlertDialog dialog = new AlertDialog.Builder(ctx)
+                .setView(layout)
+                .setCancelable(true)
+                .create();
+
+        closeBtn.setOnClickListener(v -> dialog.dismiss());
+        installBtn.setOnClickListener(v -> {
+            installBtn.setEnabled(false);
+            closeBtn.setEnabled(false);
+            installBtn.setText("Descargando...");
+            progress.setVisibility(View.VISIBLE);
+            status.setVisibility(View.VISIBLE);
+            status.setText("Descargando actualización...");
+
+            mUpdateChecker.install(update, requireActivity(), new UpdateChecker.DownloadProgressCallback() {
+                @Override
+                public void onProgress(int percent, long currentBytes, long totalBytes) {
+                    progress.setProgress(percent);
+                    double mbCur = currentBytes / (1024.0 * 1024.0);
+                    double mbTot = totalBytes / (1024.0 * 1024.0);
+                    status.setText(String.format("%d%% (%.1f MB / %.1f MB)", percent, mbCur, mbTot));
+                }
+
+                @Override
+                public void onSuccess(File apkFile) {
+                    status.setText("Abriendo instalador...");
+                    dialog.dismiss();
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    installBtn.setEnabled(true);
+                    closeBtn.setEnabled(true);
+                    installBtn.setText("Reintentar");
+                    status.setText("Error en la descarga. Comprueba tu conexión.");
+                }
+            });
+        });
+
+        mUpdateDialog = dialog;
+        dialog.show();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void openGameDirectory(Context context) {

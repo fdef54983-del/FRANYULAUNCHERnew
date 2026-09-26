@@ -19,12 +19,12 @@ import android.widget.TextView;
 import net.kdt.pojavlaunch.fragments.UpdateChecker;
 
 public final class UpdateStartupGate implements AutoCloseable {
-    private static final long MIN_LOADING_MS = 550L;
-    private static final int EMERALD = Color.rgb(31, 174, 118);
-    private static final int DARK = Color.rgb(10, 18, 14);
-    private static final int PANEL = Color.rgb(20, 31, 25);
-    private static final int TEXT = Color.rgb(242, 247, 244);
-    private static final int MUTED = Color.rgb(170, 184, 176);
+    private static final long MIN_LOADING_MS = 400L;
+    private static final int EMERALD = Color.rgb(53, 201, 111);
+    private static final int DARK = Color.rgb(11, 18, 13);
+    private static final int PANEL = Color.rgb(22, 35, 26);
+    private static final int TEXT = Color.rgb(241, 247, 242);
+    private static final int MUTED = Color.rgb(166, 184, 170);
 
     private final Activity activity;
     private final UpdateChecker checker;
@@ -97,7 +97,7 @@ public final class UpdateStartupGate implements AutoCloseable {
         overlay.removeAllViews();
 
         View dim = new View(activity);
-        dim.setBackgroundColor(Color.argb(145, 0, 0, 0));
+        dim.setBackgroundColor(Color.argb(160, 0, 0, 0));
         overlay.addView(dim, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout panel = new LinearLayout(activity);
@@ -105,47 +105,61 @@ public final class UpdateStartupGate implements AutoCloseable {
         panel.setPadding(dp(22), dp(22), dp(22), dp(18));
         GradientDrawable background = new GradientDrawable();
         background.setColor(PANEL);
-        background.setCornerRadius(dp(24));
-        background.setStroke(dp(1), Color.rgb(44, 90, 67));
+        background.setCornerRadius(dp(20));
+        background.setStroke(dp(1), Color.rgb(46, 81, 56));
         panel.setBackground(background);
 
-        TextView title = text("Nueva actualización", 22, TEXT, Typeface.BOLD);
+        TextView title = text("¡Nueva actualización disponible!", 20, TEXT, Typeface.BOLD);
         panel.addView(title, new LinearLayout.LayoutParams(-1, -2));
-        TextView version = text("FranyuLauncher " + update.version, 15, EMERALD, Typeface.BOLD);
+        
+        TextView version = text("Versión " + update.version, 15, EMERALD, Typeface.BOLD);
         LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(-1, -2);
-        versionParams.topMargin = dp(5);
+        versionParams.topMargin = dp(4);
         panel.addView(version, versionParams);
 
-        TextView label = text("Novedades", 13, MUTED, Typeface.BOLD);
+        TextView label = text("Novedades y Cambios", 13, MUTED, Typeface.BOLD);
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
-        labelParams.topMargin = dp(18);
+        labelParams.topMargin = dp(14);
         panel.addView(label, labelParams);
 
         ScrollView notesScroll = new ScrollView(activity);
-        TextView notes = text(cleanBody(update.body), 14, TEXT, Typeface.NORMAL);
-        notes.setLineSpacing(0, 1.12f);
-        notes.setPadding(0, dp(7), 0, dp(7));
+        TextView notes = text(cleanBody(update.body), 13, TEXT, Typeface.NORMAL);
+        notes.setLineSpacing(0, 1.15f);
+        notes.setPadding(0, dp(6), 0, dp(6));
         notesScroll.addView(notes);
-        LinearLayout.LayoutParams notesParams = new LinearLayout.LayoutParams(-1, dp(220));
+        LinearLayout.LayoutParams notesParams = new LinearLayout.LayoutParams(-1, dp(180));
         notesParams.topMargin = dp(4);
         panel.addView(notesScroll, notesParams);
+
+        ProgressBar downloadProgress = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
+        downloadProgress.setIndeterminate(false);
+        downloadProgress.setMax(100);
+        downloadProgress.setProgress(0);
+        downloadProgress.setVisibility(View.GONE);
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(16));
+        progressLp.topMargin = dp(12);
+        panel.addView(downloadProgress, progressLp);
+
+        TextView downloadStatus = text("", 12, EMERALD, Typeface.NORMAL);
+        downloadStatus.setVisibility(View.GONE);
+        downloadStatus.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
+        statusLp.topMargin = dp(4);
+        panel.addView(downloadStatus, statusLp);
 
         LinearLayout actions = new LinearLayout(activity);
         actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         actions.setOrientation(LinearLayout.HORIZONTAL);
 
         Button skip = new Button(activity);
-        skip.setText("Omitir");
+        skip.setText("Cerrar");
         skip.setTextColor(MUTED);
         skip.setAllCaps(false);
         skip.setMinHeight(dp(48));
-        skip.setOnClickListener(v -> {
-            checker.skipVersion(update.version);
-            finish(continueToLauncher);
-        });
+        skip.setOnClickListener(v -> finish(continueToLauncher));
 
         Button install = new Button(activity);
-        install.setText("Instalar");
+        install.setText("Instalar ahora");
         install.setTextColor(Color.WHITE);
         install.setAllCaps(false);
         install.setMinHeight(dp(48));
@@ -157,11 +171,37 @@ public final class UpdateStartupGate implements AutoCloseable {
             install.setEnabled(false);
             skip.setEnabled(false);
             install.setText("Descargando...");
-            checker.install(update, activity);
+            downloadProgress.setVisibility(View.VISIBLE);
+            downloadStatus.setVisibility(View.VISIBLE);
+            downloadStatus.setText("Iniciando descarga directa...");
+
+            checker.install(update, activity, new UpdateChecker.DownloadProgressCallback() {
+                @Override
+                public void onProgress(int percent, long currentBytes, long totalBytes) {
+                    downloadProgress.setProgress(percent);
+                    double mbCur = currentBytes / (1024.0 * 1024.0);
+                    double mbTot = totalBytes / (1024.0 * 1024.0);
+                    downloadStatus.setText(String.format("Descargando: %d%% (%.1f MB / %.1f MB)", percent, mbCur, mbTot));
+                }
+
+                @Override
+                public void onSuccess(java.io.File apkFile) {
+                    downloadStatus.setText("Descarga completa. Abriendo instalador...");
+                    install.setText("Instalando");
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    install.setEnabled(true);
+                    skip.setEnabled(true);
+                    install.setText("Reintentar");
+                    downloadStatus.setText("Error en la descarga. Comprueba tu conexión.");
+                }
+            });
         });
 
         actions.addView(skip, new LinearLayout.LayoutParams(dp(100), dp(52)));
-        LinearLayout.LayoutParams installParams = new LinearLayout.LayoutParams(dp(120), dp(52));
+        LinearLayout.LayoutParams installParams = new LinearLayout.LayoutParams(dp(130), dp(52));
         installParams.leftMargin = dp(8);
         actions.addView(install, installParams);
         LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(58));
@@ -175,7 +215,7 @@ public final class UpdateStartupGate implements AutoCloseable {
     }
 
     private String cleanBody(String body) {
-        if (body == null || body.trim().isEmpty()) return "Esta actualización no incluye notas adicionales.";
+        if (body == null || body.trim().isEmpty()) return "Esta actualización incluye mejoras de rendimiento y correcciones de estabilidad.";
         return body.trim();
     }
 
