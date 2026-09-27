@@ -11,6 +11,12 @@
             android:summary="@string/multirt_subtitle"
             android:title="@string/multirt_title"/>
 
+        <Preference
+            android:key="catalog_jre"
+            android:persistent="false"
+            android:summary="@string/multirt_catalog_subtitle"
+            android:title="@string/multirt_catalog_title"/>
+
         <androidx.preference.EditTextPreference
             android:dialogTitle="@string/mcl_setting_title_javaargs"
 

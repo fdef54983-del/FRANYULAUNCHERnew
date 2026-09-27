@@ -3,6 +3,7 @@ package net.kdt.pojavlaunch;
 import static net.kdt.pojavlaunch.Architecture.archAsString;
 
 import android.app.Activity;
+import androidx.appcompat.app.AlertDialog;
 import android.content.res.AssetManager;
 import android.util.Log;
 
@@ -143,8 +144,17 @@ public class NewJREUtil {
     }
 
     private static void showRuntimeFail(Activity activity, JMinecraftVersionList.Version verInfo) {
-        Tools.dialogOnUiThread(activity, activity.getString(R.string.global_error),
-                activity.getString(R.string.multirt_nocompatiblert, verInfo.javaVersion.majorVersion));
+        int reqVer = verInfo.javaVersion != null ? verInfo.javaVersion.majorVersion : 8;
+        Tools.runOnUiThread(() -> {
+            new AlertDialog.Builder(activity)
+                    .setTitle(R.string.global_error)
+                    .setMessage(activity.getString(R.string.multirt_nocompatiblert, reqVer))
+                    .setPositiveButton(R.string.multirt_catalog_title, (d, w) -> {
+                        net.kdt.pojavlaunch.multirt.RuntimeCatalogManager.showCatalogDialog(activity, null);
+                    })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+        });
     }
 
     private enum InternalRuntime {

@@ -475,4 +475,9 @@
     <string name="update_dialog_close">Cerrar</string>
     <string name="update_dialog_downloading">Descargando actualización (%d%%)...</string>
     <string name="update_dialog_changelog">Novedades de la versión:</string>
+    <string name="multirt_catalog_title">Catálogo de Runtimes Java</string>
+    <string name="multirt_catalog_subtitle">Descargar runtimes oficiales y de compatibilidad</string>
+    <string name="multirt_downloading_runtime">Descargando Java Runtime: %s</string>
+    <string name="multirt_install_success">Runtime %s instalado correctamente</string>
+    <string name="multirt_installed_badge">[Instalado]</string>
 </resources>

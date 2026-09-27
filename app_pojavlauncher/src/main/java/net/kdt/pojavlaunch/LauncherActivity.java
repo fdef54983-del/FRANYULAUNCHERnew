@@ -44,6 +44,8 @@ import net.kdt.pojavlaunch.services.ProgressServiceKeeper;
 import net.kdt.pojavlaunch.tasks.AsyncMinecraftDownloader;
 import net.kdt.pojavlaunch.tasks.AsyncVersionList;
 import net.kdt.pojavlaunch.tasks.MinecraftDownloader;
+import net.kdt.pojavlaunch.multirt.MultiRTUtils;
+import net.kdt.pojavlaunch.multirt.RuntimeCatalogManager;
 import net.kdt.pojavlaunch.utils.NotificationUtils;
 import java.lang.ref.WeakReference;
 import git.artdeell.mojo.R;
@@ -127,6 +129,13 @@ public class LauncherActivity extends BaseActivity {
         mProgressLayout.observe(ProgressLayout.AUTHENTICATE);
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_VERSION_LIST);
         mProgressLayout.observe(ProgressLayout.INSTANCE_INSTALL);
+
+        // Ensure at least one base Java runtime exists for instant out-of-the-box compatibility
+        try {
+            if (MultiRTUtils.getRuntimes().isEmpty()) {
+                RuntimeCatalogManager.downloadAndInstallRuntime(this, RuntimeCatalogManager.CATALOG.get(0), null);
+            }
+        } catch (Throwable ignored) {}
     }
 
     private void finishStartupGate(){

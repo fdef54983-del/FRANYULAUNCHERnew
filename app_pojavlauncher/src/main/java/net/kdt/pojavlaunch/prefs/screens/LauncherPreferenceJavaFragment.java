@@ -51,6 +51,16 @@ public class LauncherPreferenceJavaFragment extends LauncherPreferenceFragment {
             openMultiRTDialog();
             return true;
         });
+
+        androidx.preference.Preference catalogPref = findPreference("catalog_jre");
+        if (catalogPref != null) {
+            catalogPref.setOnPreferenceClickListener(preference -> {
+                net.kdt.pojavlaunch.multirt.RuntimeCatalogManager.showCatalogDialog(getContext(), () -> {
+                    if (mDialogScreen != null) mDialogScreen.refresh();
+                });
+                return true;
+            });
+        }
     }
 
     private void openMultiRTDialog() {

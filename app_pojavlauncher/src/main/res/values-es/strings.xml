@@ -351,4 +351,9 @@
     <string name="local_login_bad_username_title">Nombre de usuario inadecuado</string>
     <string name="local_login_bad_username_text">El nombre de usuario debe de ser entre 3 a 16 caracteres, y solo contener letras latinas, números de 0 a 9 y guiones bajos.</string>
     <string name="quick_setting_title">Configuraciones rápidas</string>
+    <string name="multirt_catalog_title">Catálogo de Runtimes Java</string>
+    <string name="multirt_catalog_subtitle">Descargar runtimes oficiales y de compatibilidad</string>
+    <string name="multirt_downloading_runtime">Descargando Java Runtime: %s</string>
+    <string name="multirt_install_success">Runtime %s instalado correctamente</string>
+    <string name="multirt_installed_badge">[Instalado]</string>
 </resources>

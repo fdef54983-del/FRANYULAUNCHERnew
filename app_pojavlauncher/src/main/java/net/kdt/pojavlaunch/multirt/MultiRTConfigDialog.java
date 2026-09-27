@@ -37,7 +37,12 @@ public class MultiRTConfigDialog {
         mDialog = new AlertDialog.Builder(activity)
                 .setTitle(R.string.multirt_config_title)
                 .setView(mDialogView)
-                .setPositiveButton(R.string.multirt_config_add, (dialog, which) -> installJvmLauncher.launch(null))
+                .setPositiveButton(R.string.multirt_catalog_title, (dialog, which) -> {
+                    RuntimeCatalogManager.showCatalogDialog(activity, () -> {
+                        refresh();
+                    });
+                })
+                .setNegativeButton(R.string.multirt_config_add, (dialog, which) -> installJvmLauncher.launch(null))
                 .setNeutralButton(R.string.multirt_delete_runtime, null)
                 .create();
 
