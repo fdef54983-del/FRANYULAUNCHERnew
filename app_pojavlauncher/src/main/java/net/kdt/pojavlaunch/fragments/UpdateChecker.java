@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -18,6 +19,7 @@ import android.widget.Toast;
 import androidx.core.content.FileProvider;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -32,11 +34,16 @@ import java.util.concurrent.Executors;
 import git.artdeell.mojo.BuildConfig;
 
 public class UpdateChecker implements AutoCloseable {
+    private static final String TAG = "UpdateChecker";
     private static final String RELEASES_URL =
             "https://api.github.com/repos/fdef54983-del/FRANYULAUNCHERnew/releases/latest";
     private static final String PREFS = "franyu_updates";
     private static final String KEY_SKIPPED = "skipped_version";
     private static final String KEY_PENDING_APK = "pending_apk";
+    private static final String KEY_LAST_SEEN_RELEASE_UPDATED = "last_seen_release_updated";
+    private static final String KEY_LAST_SEEN_ASSET_UPDATED = "last_seen_asset_updated";
+    private static final String KEY_CURRENT_INSTALLED_BUILD = "current_installed_build";
+
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -47,12 +54,23 @@ public class UpdateChecker implements AutoCloseable {
         public final String body;
         public final String apkUrl;
         public final long size;
+        public final String releaseUpdatedAt;
+        public final String assetUpdatedAt;
+        public final boolean isSameVersionPatch;
 
-        public Update(String version, String body, String apkUrl, long size) {
+        public Update(String version, String body, String apkUrl, long size,
+                      String releaseUpdatedAt, String assetUpdatedAt, boolean isSameVersionPatch) {
             this.version = version;
             this.body = body;
             this.apkUrl = apkUrl;
             this.size = size;
+            this.releaseUpdatedAt = releaseUpdatedAt;
+            this.assetUpdatedAt = assetUpdatedAt;
+            this.isSameVersionPatch = isSameVersionPatch;
+        }
+
+        public String getUniqueFingerprint() {
+            return version + "#" + releaseUpdatedAt + "#" + assetUpdatedAt;
         }
     }
 
@@ -68,6 +86,19 @@ public class UpdateChecker implements AutoCloseable {
 
     public UpdateChecker(Context context) {
         this.context = context.getApplicationContext();
+        ensureLocalBuildBaseline();
+    }
+
+    private void ensureLocalBuildBaseline() {
+        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String savedBuild = sp.getString(KEY_CURRENT_INSTALLED_BUILD, "");
+        String currentBuild = (BuildConfig.VERSION_NAME != null ? BuildConfig.VERSION_NAME : "")
+                + "_" + BuildConfig.VERSION_CODE;
+        if (!currentBuild.equals(savedBuild)) {
+            sp.edit()
+                    .putString(KEY_CURRENT_INSTALLED_BUILD, currentBuild)
+                    .apply();
+        }
     }
 
     public void check(Callback callback) {
@@ -79,7 +110,7 @@ public class UpdateChecker implements AutoCloseable {
                 connection.setConnectTimeout(8000);
                 connection.setReadTimeout(12000);
                 connection.setRequestProperty("Accept", "application/vnd.github+json");
-                connection.setRequestProperty("User-Agent", "FranyuLauncher/1.3");
+                connection.setRequestProperty("User-Agent", "FranyuLauncher/1.5");
                 if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
                     StringBuilder json = new StringBuilder();
                     try (InputStream in = connection.getInputStream()) {
@@ -90,23 +121,67 @@ public class UpdateChecker implements AutoCloseable {
                         }
                     }
                     JsonObject release = new JsonParser().parse(json.toString()).getAsJsonObject();
-                    String tag = release.has("tag_name") ? release.get("tag_name").getAsString() : "";
+                    String tag = release.has("tag_name") && !release.get("tag_name").isJsonNull()
+                            ? release.get("tag_name").getAsString() : "";
                     String version = tag.startsWith("v") ? tag.substring(1) : tag;
                     String installed = BuildConfig.VERSION_NAME == null ? "" : BuildConfig.VERSION_NAME;
-                    String skipped = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                            .getString(KEY_SKIPPED, "");
-                    
-                    if (isNewer(version, installed) && !version.equals(skipped)) {
-                        ApkAsset asset = findCompatibleApk(release);
-                        if (asset != null) {
-                            update = new Update(version,
-                                    release.has("body") ? release.get("body").getAsString() : "",
-                                    asset.url, asset.size);
+
+                    String releaseUpdatedAt = getStringField(release, "updated_at");
+                    if (releaseUpdatedAt.isEmpty()) {
+                        releaseUpdatedAt = getStringField(release, "published_at");
+                    }
+
+                    ApkAsset asset = findCompatibleApk(release);
+                    if (asset != null) {
+                        String assetUpdatedAt = asset.updatedAt;
+                        if (assetUpdatedAt.isEmpty()) {
+                            assetUpdatedAt = releaseUpdatedAt;
+                        }
+
+                        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                        String skipped = sp.getString(KEY_SKIPPED, "");
+                        String lastSeenReleaseUpdated = sp.getString(KEY_LAST_SEEN_RELEASE_UPDATED, "");
+                        String lastSeenAssetUpdated = sp.getString(KEY_LAST_SEEN_ASSET_UPDATED, "");
+
+                        boolean newerVersion = isNewer(version, installed);
+                        boolean sameVersion = isSameOrEquivalentVersion(version, installed);
+
+                        boolean contentChanged = false;
+                        if (!releaseUpdatedAt.isEmpty() && !releaseUpdatedAt.equals(lastSeenReleaseUpdated)) {
+                            contentChanged = true;
+                        }
+                        if (!assetUpdatedAt.isEmpty() && !assetUpdatedAt.equals(lastSeenAssetUpdated)) {
+                            contentChanged = true;
+                        }
+
+                        boolean shouldNotify = false;
+                        boolean isSameVersionPatch = false;
+
+                        if (newerVersion) {
+                            shouldNotify = true;
+                            isSameVersionPatch = false;
+                        } else if (sameVersion && contentChanged) {
+                            shouldNotify = true;
+                            isSameVersionPatch = true;
+                        }
+
+                        String candidateFingerprint = version + "#" + releaseUpdatedAt + "#" + assetUpdatedAt;
+                        if (shouldNotify && !candidateFingerprint.equals(skipped) && !version.equals(skipped)) {
+                            update = new Update(
+                                    version,
+                                    release.has("body") && !release.get("body").isJsonNull()
+                                            ? release.get("body").getAsString() : "",
+                                    asset.url,
+                                    asset.size,
+                                    releaseUpdatedAt,
+                                    assetUpdatedAt,
+                                    isSameVersionPatch
+                            );
                         }
                     }
                 }
             } catch (Exception e) {
-                Log.w("UpdateChecker", "Failed to check for updates: " + e.getMessage());
+                Log.w(TAG, "Failed to check for updates: " + e.getMessage());
             } finally {
                 if (connection != null) connection.disconnect();
             }
@@ -119,12 +194,24 @@ public class UpdateChecker implements AutoCloseable {
         });
     }
 
+    private static String getStringField(JsonObject obj, String field) {
+        if (obj != null && obj.has(field) && !obj.get(field).isJsonNull()) {
+            try {
+                return obj.get(field).getAsString();
+            } catch (Exception ignored) {}
+        }
+        return "";
+    }
+
     private static class ApkAsset {
         final String url;
         final long size;
-        ApkAsset(String url, long size) {
+        final String updatedAt;
+
+        ApkAsset(String url, long size, String updatedAt) {
             this.url = url;
             this.size = size;
+            this.updatedAt = updatedAt != null ? updatedAt : "";
         }
     }
 
@@ -133,20 +220,40 @@ public class UpdateChecker implements AutoCloseable {
         JsonArray assets = release.getAsJsonArray("assets");
         ApkAsset fallback = null;
         for (int i = 0; i < assets.size(); i++) {
-            JsonObject asset = assets.get(i).getAsJsonObject();
+            JsonElement el = assets.get(i);
+            if (!el.isJsonObject()) continue;
+            JsonObject asset = el.getAsJsonObject();
             if (!asset.has("name") || !asset.has("browser_download_url")) continue;
             String name = asset.get("name").getAsString();
             String lower = name.toLowerCase();
             if (!lower.endsWith(".apk")) continue;
             if (lower.contains("noruntime")) continue;
+
             String url = asset.get("browser_download_url").getAsString();
             long size = asset.has("size") ? asset.get("size").getAsLong() : 0L;
+            String updatedAt = getStringField(asset, "updated_at");
+
             if (lower.contains("franyulauncher")) {
-                return new ApkAsset(url, size);
+                return new ApkAsset(url, size, updatedAt);
             }
-            if (fallback == null) fallback = new ApkAsset(url, size);
+            if (fallback == null) {
+                fallback = new ApkAsset(url, size, updatedAt);
+            }
         }
         return fallback;
+    }
+
+    public static boolean isSameOrEquivalentVersion(String remote, String installed) {
+        if (remote == null || installed == null) return false;
+        int[] r = numbers(remote);
+        int[] i = numbers(installed);
+        int len = Math.max(r.length, i.length);
+        for (int n = 0; n < len; n++) {
+            int rv = n < r.length ? r[n] : 0;
+            int iv = n < i.length ? i[n] : 0;
+            if (rv != iv) return false;
+        }
+        return true;
     }
 
     public static boolean isNewer(String remote, String installed) {
@@ -179,26 +286,39 @@ public class UpdateChecker implements AutoCloseable {
         return result;
     }
 
-    public void skipVersion(String version) {
+    public void skipUpdate(Update update) {
+        if (update == null) return;
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putString(KEY_SKIPPED, version == null ? "" : version).apply();
+                .putString(KEY_SKIPPED, update.getUniqueFingerprint())
+                .apply();
+    }
+
+    public void markUpdateObserved(Update update) {
+        if (update == null) return;
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(KEY_LAST_SEEN_RELEASE_UPDATED, update.releaseUpdatedAt)
+                .putString(KEY_LAST_SEEN_ASSET_UPDATED, update.assetUpdatedAt)
+                .apply();
     }
 
     public void install(Update update, Activity activity, DownloadProgressCallback progressCallback) {
         if (update == null || activity == null || closed) return;
         executor.execute(() -> {
-            File apk = new File(context.getCacheDir(), "franyulauncher-" + update.version + ".apk");
+            String safeVersion = update.version.replaceAll("[^a-zA-Z0-9._-]", "_");
+            File apk = new File(context.getCacheDir(), "franyulauncher-" + safeVersion + ".apk");
             try {
                 downloadWithProgress(update.apkUrl, apk, update.size, progressCallback);
                 validateApk(apk);
+                markUpdateObserved(update);
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                        .putString(KEY_PENDING_APK, apk.getAbsolutePath()).apply();
+                        .putString(KEY_PENDING_APK, apk.getAbsolutePath())
+                        .apply();
                 main.post(() -> {
                     if (progressCallback != null) progressCallback.onSuccess(apk);
                     launchInstaller(activity, apk);
                 });
             } catch (Exception e) {
-                Log.e("UpdateChecker", "Failed to download/install update", e);
+                Log.e(TAG, "Failed to download/install update", e);
                 if (!closed) {
                     main.post(() -> {
                         if (progressCallback != null) progressCallback.onError(e);
@@ -213,7 +333,6 @@ public class UpdateChecker implements AutoCloseable {
 
     private void downloadWithProgress(String url, File destination, long expectedSize, DownloadProgressCallback callback) throws Exception {
         if (destination.exists() && destination.length() == expectedSize && expectedSize > 1024L) {
-            // Already downloaded completely
             if (callback != null) main.post(() -> callback.onProgress(100, expectedSize, expectedSize));
             return;
         }
@@ -221,11 +340,11 @@ public class UpdateChecker implements AutoCloseable {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(60000);
-        connection.setRequestProperty("User-Agent", "FranyuLauncher/1.3");
+        connection.setRequestProperty("User-Agent", "FranyuLauncher/1.5");
         connection.setInstanceFollowRedirects(true);
         int response = connection.getResponseCode();
         if (response != HttpURLConnection.HTTP_OK) throw new java.io.IOException("HTTP " + response);
-        
+
         long totalBytes = connection.getContentLengthLong();
         if (totalBytes <= 0) totalBytes = expectedSize;
 

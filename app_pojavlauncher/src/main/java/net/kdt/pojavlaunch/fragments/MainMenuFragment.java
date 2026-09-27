@@ -276,14 +276,22 @@ public class MainMenuFragment extends Fragment {
         layout.setBackground(bg);
 
         TextView title = new TextView(ctx);
-        title.setText("¡Nueva actualización disponible!");
+        if (update.isSameVersionPatch) {
+            title.setText("¡Actualización de la versión disponible!");
+        } else {
+            title.setText("¡Nueva actualización disponible!");
+        }
         title.setTextSize(18);
         title.setTextColor(text);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         layout.addView(title);
 
         TextView version = new TextView(ctx);
-        version.setText("FranyuLauncher " + update.version);
+        if (update.isSameVersionPatch) {
+            version.setText("Se actualizó la versión " + update.version);
+        } else {
+            version.setText("FranyuLauncher " + update.version);
+        }
         version.setTextSize(14);
         version.setTextColor(emerald);
         version.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -333,6 +341,11 @@ public class MainMenuFragment extends Fragment {
         LinearLayout.LayoutParams btnsLp = new LinearLayout.LayoutParams(-1, -2);
         btnsLp.topMargin = dp(14);
 
+        Button skipBtn = new Button(ctx);
+        skipBtn.setText("Omitir");
+        skipBtn.setTextColor(Color.rgb(248, 113, 113));
+        skipBtn.setAllCaps(false);
+
         Button closeBtn = new Button(ctx);
         closeBtn.setText("Cerrar");
         closeBtn.setTextColor(muted);
@@ -347,9 +360,12 @@ public class MainMenuFragment extends Fragment {
         instBg.setCornerRadius(dp(12));
         installBtn.setBackground(instBg);
 
-        LinearLayout.LayoutParams instLp = new LinearLayout.LayoutParams(dp(120), dp(48));
+        LinearLayout.LayoutParams instLp = new LinearLayout.LayoutParams(dp(110), dp(48));
         instLp.leftMargin = dp(8);
-        buttons.addView(closeBtn, new LinearLayout.LayoutParams(dp(90), dp(48)));
+        LinearLayout.LayoutParams skipLp = new LinearLayout.LayoutParams(dp(85), dp(48));
+        skipLp.rightMargin = dp(4);
+        buttons.addView(skipBtn, skipLp);
+        buttons.addView(closeBtn, new LinearLayout.LayoutParams(dp(80), dp(48)));
         buttons.addView(installBtn, instLp);
         layout.addView(buttons, btnsLp);
 
@@ -358,10 +374,17 @@ public class MainMenuFragment extends Fragment {
                 .setCancelable(true)
                 .create();
 
+        skipBtn.setOnClickListener(v -> {
+            mUpdateChecker.skipUpdate(update);
+            dialog.dismiss();
+            Toast.makeText(ctx, "Esta actualización ha sido omitida.", Toast.LENGTH_SHORT).show();
+        });
+
         closeBtn.setOnClickListener(v -> dialog.dismiss());
         installBtn.setOnClickListener(v -> {
             installBtn.setEnabled(false);
             closeBtn.setEnabled(false);
+            skipBtn.setEnabled(false);
             installBtn.setText("Descargando...");
             progress.setVisibility(View.VISIBLE);
             status.setVisibility(View.VISIBLE);
@@ -386,6 +409,7 @@ public class MainMenuFragment extends Fragment {
                 public void onError(Exception e) {
                     installBtn.setEnabled(true);
                     closeBtn.setEnabled(true);
+                    skipBtn.setEnabled(true);
                     installBtn.setText("Reintentar");
                     status.setText("Error en la descarga. Comprueba tu conexión.");
                 }
@@ -445,5 +469,4 @@ public class MainMenuFragment extends Fragment {
             Toast.makeText(requireContext(), R.string.tasks_ongoing, Toast.LENGTH_LONG).show();
         }
     }
-
 }
