@@ -20,14 +20,14 @@ static def getDateSeconds() {
 }
 def getVersionName = {
     try {
-        if (grgit == null) return "LOCAL-${getDate()}"
+        if (grgit == null) return "1.5-${getDate()}"
         def currentBranch = grgit.branch.current()
         def latestCommit = grgit.log(maxCommits: 1)
         def dateToday = getDate()
-        if (currentBranch == null || latestCommit == null) return "1.4-${dateToday}"
-        return "1.4-${dateToday}-${latestCommit.abbreviatedId}-${currentBranch.getName()}"
+        if (currentBranch == null || latestCommit == null) return "1.5-${dateToday}"
+        return "1.5-${dateToday}-${latestCommit.abbreviatedId}-${currentBranch.getName()}"
     } catch (Exception ignored) {
-        return "LOCAL-${getDate()}"
+        return "1.5-${getDate()}"
     }
 }
 def getCFApiKey = { String key=System.getenv("CURSEFORGE_API_KEY"); if(key!=null)return key; File f=new File("./curseforge_key.txt"); if(f.canRead()&&f.isFile())return f.text; logger.warn('BUILD: You have no CurseForge key, the curseforge api will get disabled !'); return "DUMMY" }
