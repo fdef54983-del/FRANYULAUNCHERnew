@@ -114,17 +114,25 @@ public class AsyncAssetManager {
         }
     }
 
+    public static void forceUnpackComponent(Context ctx, String component, boolean privateDirectory) throws IOException {
+        unpackComponentInternal(ctx, component, privateDirectory, true);
+    }
+
     private static void unpackComponent(Context ctx, String component, boolean privateDirectory) throws IOException {
+        unpackComponentInternal(ctx, component, privateDirectory, false);
+    }
+
+    private static void unpackComponentInternal(Context ctx, String component, boolean privateDirectory, boolean force) throws IOException {
         AssetManager am = ctx.getAssets();
         String rootDir = privateDirectory ? Tools.DIR_DATA : Tools.DIR_GAME_HOME;
         File componentTarget = new File(rootDir, component);
         String installedVersion = readInstalledComponentVersion(componentTarget);
         String builtinVersion = readBuiltinComponentVersion(am, component);
-        if(installedVersion != null && installedVersion.equals(builtinVersion)) {
+        if(!force && installedVersion != null && installedVersion.equals(builtinVersion)) {
             Log.i("AssetUnpacker", "Component "+component+" is up-to-date, continuing...");
             return;
         }
-        Log.i("AssetUnpacker", "Updating "+component);
+        Log.i("AssetUnpacker", (force ? "Force updating " : "Updating ") + component);
 
         if(componentTarget.exists()) {
             FileUtils.deleteDirectory(componentTarget);
@@ -136,15 +144,19 @@ public class AsyncAssetManager {
         String componentSource = "components/" + component;
 
         String[] fileList = am.list(componentSource);
-        for (String fileName : fileList) {
-            if(fileName.equals("version")) continue;
-            String sourcePath = componentSource + "/" + fileName;
-            Tools.copyAssetFile(ctx, sourcePath, componentTarget.getAbsolutePath(), true);
+        if (fileList != null) {
+            for (String fileName : fileList) {
+                if(fileName.equals("version")) continue;
+                String sourcePath = componentSource + "/" + fileName;
+                Tools.copyAssetFile(ctx, sourcePath, componentTarget.getAbsolutePath(), true);
+            }
         }
 
         // Always write the version file separately after extracting everything else, to improve
         // reliability.
-        Tools.write(componentTarget.getAbsolutePath()+"/version", builtinVersion);
+        if (builtinVersion != null) {
+            Tools.write(componentTarget.getAbsolutePath()+"/version", builtinVersion);
+        }
     }
 
     public static void extractDefaultSettings(Context context, File gamedir)  {

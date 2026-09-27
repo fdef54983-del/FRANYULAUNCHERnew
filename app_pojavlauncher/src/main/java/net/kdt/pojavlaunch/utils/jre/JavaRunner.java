@@ -15,19 +15,98 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.multirt.MultiRTUtils;
 import net.kdt.pojavlaunch.multirt.Runtime;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.tasks.AsyncAssetManager;
 import net.kdt.pojavlaunch.utils.JREUtils;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
 import java.util.TimeZone;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class JavaRunner {
 
-    private static boolean getCacioJavaArgs(List<String> javaArgList, boolean isJava8) {
+    private static final String TAG = "JavaRunner";
+    private static final String CACIO_AGENT_CLASS = "com/github/caciocavallosilano/cacio/ctc/CTCPreloadAgent.class";
+
+    /**
+     * Checks whether a given JAR file exists, has a non-zero size, is a valid readable ZIP archive,
+     * and contains the specified required class entry.
+     */
+    private static boolean isValidJarContaining(File jarFile, String requiredEntry) {
+        if (jarFile == null || !jarFile.exists() || !jarFile.isFile() || jarFile.length() == 0) {
+            Log.e(TAG, "Jar file is missing, empty or not a file: " + (jarFile == null ? "null" : jarFile.getAbsolutePath()));
+            return false;
+        }
+
+        try (ZipFile zipFile = new ZipFile(jarFile)) {
+            if (requiredEntry == null) {
+                return zipFile.size() > 0;
+            }
+            ZipEntry entry = zipFile.getEntry(requiredEntry);
+            if (entry != null) {
+                return true;
+            }
+            Log.e(TAG, "Jar file " + jarFile.getAbsolutePath() + " does not contain required entry: " + requiredEntry);
+            return false;
+        } catch (IOException e) {
+            Log.e(TAG, "Jar file " + jarFile.getAbsolutePath() + " is corrupt or not a valid ZIP/JAR archive: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Locates a valid caciocavallo17 agent JAR in the given directory.
+     * Looks specifically for JARs matching known naming patterns (e.g., "cacio-tta-")
+     * and strictly validates that the archive contains the required CTCPreloadAgent class.
+     */
+    private static File findValidCacio17AgentJar(File caciocavallo17AgentDir) {
+        if (!caciocavallo17AgentDir.exists() || !caciocavallo17AgentDir.isDirectory()) {
+            Log.e(TAG, "caciocavallo17 directory does not exist or is not a directory: " + caciocavallo17AgentDir.getAbsolutePath());
+            return null;
+        }
+
+        File[] files = caciocavallo17AgentDir.listFiles();
+        if (files == null || files.length == 0) {
+            Log.e(TAG, "caciocavallo17 directory is empty: " + caciocavallo17AgentDir.getAbsolutePath());
+            return null;
+        }
+
+        Log.i(TAG, "Scanning caciocavallo17 directory (" + caciocavallo17AgentDir.getAbsolutePath() + "), found " + files.length + " entries.");
+
+        // First pass: Prioritize jars starting with expected prefix "cacio-tta"
+        for (File file : files) {
+            if (file.isFile() && file.getName().endsWith(".jar") && file.getName().startsWith("cacio-tta")) {
+                if (isValidJarContaining(file, CACIO_AGENT_CLASS)) {
+                    Log.i(TAG, "Found valid priority cacio17 agent jar: " + file.getAbsolutePath());
+                    return file;
+                } else {
+                    Log.e(TAG, "Found matching file but failed validation: " + file.getAbsolutePath() + " (size: " + file.length() + " bytes)");
+                }
+            }
+        }
+
+        // Second pass: Check any .jar file in the folder in case of rename/custom build
+        for (File file : files) {
+            if (file.isFile() && file.getName().endsWith(".jar") && !file.getName().startsWith("cacio-tta")) {
+                if (isValidJarContaining(file, CACIO_AGENT_CLASS)) {
+                    Log.i(TAG, "Found valid fallback cacio17 agent jar: " + file.getAbsolutePath());
+                    return file;
+                } else {
+                    Log.e(TAG, "Fallback file failed validation: " + file.getAbsolutePath() + " (size: " + file.length() + " bytes)");
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static boolean getCacioJavaArgs(Context context, List<String> javaArgList, boolean isJava8) {
         // Caciocavallo config AWT-enabled version
         javaArgList.add("-Djava.awt.headless=false");
         javaArgList.add("-Dcacio.managed.screensize=" + AWTCanvasView.AWT_CANVAS_WIDTH + "x" + AWTCanvasView.AWT_CANVAS_HEIGHT);
@@ -37,16 +116,41 @@ public class JavaRunner {
         if (isJava8) {
             javaArgList.add("-Dawt.toolkit=net.java.openjdk.cacio.ctc.CTCToolkit");
             javaArgList.add("-Djava.awt.graphicsenv=net.java.openjdk.cacio.ctc.CTCGraphicsEnvironment");
-            StringBuilder cacioClasspath = createCacioClasspath();
+            StringBuilder cacioClasspath = createCacioClasspath(context);
+            if (cacioClasspath == null) {
+                Log.e(TAG, "Failed to resolve valid caciocavallo classpath for Java 8.");
+                return false;
+            }
             javaArgList.add(cacioClasspath.toString());
             return false;
         } else {
             File caciocavallo17AgentDir = new File(Tools.DIR_GAME_HOME, "caciocavallo17");
-            File[] cacioJars = caciocavallo17AgentDir.listFiles((file, s) ->s.endsWith(".jar"));
-            if(cacioJars == null || cacioJars.length < 1) {
+            File agentJar = findValidCacio17AgentJar(caciocavallo17AgentDir);
+
+            // If not found or corrupt, attempt an immediate synchronous re-extraction from APK assets
+            if (agentJar == null && context != null) {
+                Log.w(TAG, "Valid caciocavallo17 agent jar not found in " + caciocavallo17AgentDir.getAbsolutePath() + ". Forcing re-extraction from APK assets...");
+                try {
+                    AsyncAssetManager.forceUnpackComponent(context, "caciocavallo17", false);
+                    agentJar = findValidCacio17AgentJar(caciocavallo17AgentDir);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to re-extract caciocavallo17 component from assets!", e);
+                }
+            }
+
+            if (agentJar == null) {
+                Log.e(TAG, "FATAL: Unable to find or extract a valid caciocavallo17 agent jar in: " + caciocavallo17AgentDir.getAbsolutePath());
+                File[] remaining = caciocavallo17AgentDir.listFiles();
+                if (remaining != null) {
+                    for (File f : remaining) {
+                        Log.e(TAG, "  Remaining entry: " + f.getName() + " (" + f.length() + " bytes)");
+                    }
+                }
                 return false;
             }
-            javaArgList.add("-javaagent:"+cacioJars[0].getAbsolutePath());
+
+            Log.i(TAG, "Using verified caciocavallo17 agent: " + agentJar.getAbsolutePath());
+            javaArgList.add("-javaagent:" + agentJar.getAbsolutePath());
             javaArgList.add("-Dawt.toolkit=com.github.caciocavallosilano.cacio.ctc.CTCToolkit");
             javaArgList.add("-Djava.awt.graphicsenv=com.github.caciocavallosilano.cacio.ctc.CTCGraphicsEnvironment");
 
@@ -69,20 +173,50 @@ public class JavaRunner {
         }
     }
 
-    @NonNull
-    private static StringBuilder createCacioClasspath() {
+    private static StringBuilder createCacioClasspath(Context context) {
+        File cacioDir = new File(Tools.DIR_GAME_HOME, "caciocavallo");
+        List<File> validJars = getValidCacio8Jars(cacioDir);
+
+        if (validJars.isEmpty() && context != null) {
+            Log.w(TAG, "No valid caciocavallo jars found for Java 8. Forcing re-extraction from APK assets...");
+            try {
+                AsyncAssetManager.forceUnpackComponent(context, "caciocavallo", false);
+                validJars = getValidCacio8Jars(cacioDir);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to re-extract caciocavallo component from assets!", e);
+            }
+        }
+
+        if (validJars.isEmpty()) {
+            Log.e(TAG, "No valid jars in caciocavallo directory: " + cacioDir.getAbsolutePath());
+            return null;
+        }
+
         StringBuilder cacioClasspath = new StringBuilder();
         cacioClasspath.append("-Xbootclasspath/p");
-        File cacioDir = new File(Tools.DIR_GAME_HOME, "caciocavallo");
+        for (File file : validJars) {
+            cacioClasspath.append(":").append(file.getAbsolutePath());
+        }
+        return cacioClasspath;
+    }
+
+    private static List<File> getValidCacio8Jars(File cacioDir) {
+        List<File> list = new ArrayList<>();
+        if (!cacioDir.exists() || !cacioDir.isDirectory()) return list;
+
         File[] cacioFiles = cacioDir.listFiles();
         if (cacioFiles != null) {
             for (File file : cacioFiles) {
-                if (file.getName().endsWith(".jar")) {
-                    cacioClasspath.append(":").append(file.getAbsolutePath());
+                if (file.isFile() && file.getName().endsWith(".jar")) {
+                    if (isValidJarContaining(file, null)) {
+                        list.add(file);
+                    } else {
+                        Log.e(TAG, "Skipping corrupt caciocavallo Java 8 jar: " + file.getAbsolutePath());
+                    }
                 }
             }
         }
-        return cacioClasspath;
+        return list;
     }
 
     /**
@@ -255,17 +389,25 @@ public class JavaRunner {
      * @throws VMLoadException if an error occurred during VM loading
      */
     public static void startJvm(Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs) throws VMLoadException{
+        startJvm(null, runtime, vmArgs, classpathEntries, mainClass, applicationArgs);
+    }
+
+    /**
+     * Start the Java(tm) Virtual Machine with Context awareness for asset auto-recovery.
+     */
+    public static void startJvm(Context context, Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs) throws VMLoadException{
         File runtimeHomeDir = MultiRTUtils.getRuntimeHome(runtime.name);
         File vmPath = findVmPath(runtimeHomeDir, runtime.arch);
         if(vmPath == null) {
             throw new VMLoadException("Unable to find the Java VM", 0, -1);
         }
 
+        Context effectiveContext = context != null ? context : net.kdt.pojavlaunch.lifecycle.ContextExecutor.getApplication();
+
         boolean hasJavaAgent = preprocessUserArgs(vmArgs);
         List<String> runtimeArgs = new ArrayList<>();
-        if(getCacioJavaArgs(runtimeArgs,runtime.javaVersion == 8)) hasJavaAgent = true;
+        if(getCacioJavaArgs(effectiveContext, runtimeArgs, runtime.javaVersion == 8)) hasJavaAgent = true;
         runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs));
-
 
         runtimeArgs.add("-XX:ActiveProcessorCount=" + java.lang.Runtime.getRuntime().availableProcessors());
         StringBuilder classpathBuilder = new StringBuilder().append("-Djava.class.path=");
