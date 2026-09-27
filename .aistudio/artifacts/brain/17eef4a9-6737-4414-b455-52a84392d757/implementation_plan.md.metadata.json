@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación detallado para resolver el problema de instalación de la app sobre versiones previas (sin tener que desinstalar) y añadir descarga automática con selector de múltiples versiones de Java Runtime (Java 8, 17, 21, etc.).",
-  "updatedAt":  "2026-09-27T17:58:44.349102352Z",
+  "summary":  "Propuesta integral de 50 ideas y mejoras categorizadas y enumeradas para la futura versión 1.5 de FranyuLauncher, cubriendo rendimiento, gestión de shaders/drivers, experiencia de usuario, controles táctiles y gamepads, multijugador, gestión de instancias y diagnósticos.",
+  "updatedAt":  "2026-09-27T18:23:30.714065583Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -356,4 +356,16 @@
     <string name="multirt_downloading_runtime">Descargando Java Runtime: %s</string>
     <string name="multirt_install_success">Runtime %s instalado correctamente</string>
     <string name="multirt_installed_badge">[Instalado]</string>
+    <string name="v15_suite_title">Franyu Suite v1.5</string>
+    <string name="v15_suite_subtitle">Rendimiento, Shaders, Backups y Diagnóstico</string>
+    <string name="v15_opt_fps_title">Optimización FPS Inteligente</string>
+    <string name="v15_opt_fps_applied">¡Perfil FPS optimizado aplicado a la instancia!</string>
+    <string name="v15_backup_title">Copia de Seguridad de Instancia (.zip)</string>
+    <string name="v15_backup_success">Backup creado con éxito en:</string>
+    <string name="v15_backup_error">Error al crear la copia de seguridad</string>
+    <string name="v15_shader_title">Instalador de Shaders Móviles</string>
+    <string name="v15_shader_applied">Shaderpack instalado correctamente en shaderpacks/</string>
+    <string name="v15_diag_title">Diagnóstico Inteligente de Crashes</string>
+    <string name="v15_radial_title">Rueda Radial y Controles v1.5</string>
+    <string name="v15_turnip_title">Drivers Turnip / Zink y Gráficos</string>
 </resources>

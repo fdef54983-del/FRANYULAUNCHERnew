@@ -99,6 +99,14 @@ public class MainMenuFragment extends Fragment {
             });
         }
 
+        Button suiteButton = view.findViewById(R.id.franyu_suite_button);
+        if (suiteButton != null) {
+            suiteButton.setOnClickListener(v -> {
+                v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
+                net.kdt.pojavlaunch.features.FranyuSuiteV15.showSuiteDialog(requireContext());
+            });
+        }
+
         controls.setOnClickListener(v -> {
             v.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_fast));
             startActivity(new Intent(requireContext(), CustomControlsActivity.class));
