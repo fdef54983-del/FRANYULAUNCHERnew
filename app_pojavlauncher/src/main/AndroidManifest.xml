@@ -61,6 +61,8 @@
         <activity
             android:name="net.kdt.pojavlaunch.LauncherActivity"
             android:label="@string/app_short_name"
+            android:screenOrientation="portrait"
+            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation|uiMode"
             android:windowSoftInputMode="adjustResize"/>
         <activity
             android:name="net.kdt.pojavlaunch.ImportControlActivity"

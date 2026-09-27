@@ -15,6 +15,8 @@ import net.kdt.pojavlaunch.modloaders.OptiFineDownloadTask;
 import net.kdt.pojavlaunch.modloaders.OptiFineUtils;
 import net.kdt.pojavlaunch.modloaders.OptiFineVersionListAdapter;
 
+import net.kdt.pojavlaunch.multirt.MultiRTUtils;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -47,10 +49,13 @@ public class OptiFineInstallFragment extends ModVersionListFragment<OptiFineUtil
             ProgressLayout.setProgress(ProgressLayout.INSTALL_MODPACK, 0);
             new OptiFineDownloadTask(version).prepareForInstall();
             InstanceInstaller instanceInstaller = OptiFineUtils.createInstaller(version);
+            String instName = "OptiFine " + (version.minecraftVersion != null ? version.minecraftVersion.replace("Minecraft ", "") : "");
             InstanceManager.createInstance(instance -> {
-                instance.name = "OptiFine";
+                instance.name = instName.trim();
                 instance.installer = instanceInstaller;
                 instance.sharedData = true;
+                String jre8 = MultiRTUtils.getNearestJreName(8);
+                if(jre8 != null) instance.selectedRuntime = jre8;
             }, "OptiFine");
             ProgressLayout.clearProgress(ProgressLayout.INSTALL_MODPACK);
             instanceInstaller.start();

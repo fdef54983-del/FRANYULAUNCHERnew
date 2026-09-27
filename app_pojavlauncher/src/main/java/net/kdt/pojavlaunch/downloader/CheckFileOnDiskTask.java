@@ -42,6 +42,6 @@ public class CheckFileOnDiskTask extends DownloaderTask {
             return HashUtils.compareSHA1(localFile, mMetadata.sha1Hash);
         }
 
-        return LauncherPreferences.PREF_VERIFY_FILES || mMetadata.size == -1;
+        return true;
     }
 }

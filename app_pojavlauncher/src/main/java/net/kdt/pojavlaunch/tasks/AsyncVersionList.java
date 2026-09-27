@@ -60,6 +60,26 @@ public class AsyncVersionList {
         sExecutorService.execute(() -> getVersionListAsync(listener, 0));
     }
 
+    public static JMinecraftVersionList getVersionListSync() {
+        String repository = LauncherPreferences.PREF_VERSION_REPOS;
+        JMinecraftVersionList cached = sSessionCache;
+        if(cached != null && repository.equals(sSessionCacheRepository)) {
+            return cached;
+        }
+        try {
+            JMinecraftVersionList versionList = DownloadUtils.downloadStringCached(
+                    repository,
+                    "version_list",
+                    AsyncVersionList::parseList
+            );
+            sSessionCacheRepository = repository;
+            sSessionCache = versionList;
+            return versionList;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** Basic listener, acting as a callback */
     public interface VersionDoneListener {
         void onVersionDone(JMinecraftVersionList versions);

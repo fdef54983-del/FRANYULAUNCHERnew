@@ -20,11 +20,18 @@ public class OptiFineDownloadTask implements AsyncMinecraftDownloader.DoneListen
     public void prepareForInstall() throws Exception {
         String minecraftVersion = determineMinecraftVersion();
         if(minecraftVersion == null) return;
+        java.io.File clientJar = new java.io.File(net.kdt.pojavlaunch.Tools.DIR_HOME_VERSION, minecraftVersion + java.io.File.separator + minecraftVersion + ".jar");
+        java.io.File clientJson = new java.io.File(net.kdt.pojavlaunch.Tools.DIR_HOME_VERSION, minecraftVersion + java.io.File.separator + minecraftVersion + ".json");
+        if(clientJar.exists() && clientJar.length() > 0 && clientJson.exists() && clientJson.length() > 0) {
+            return;
+        }
         if(!downloadMinecraft(minecraftVersion)) {
             if(mDownloaderThrowable instanceof Exception) {
                 throw (Exception) mDownloaderThrowable;
-            }else {
+            }else if(mDownloaderThrowable != null) {
                 throw new Exception(mDownloaderThrowable);
+            }else {
+                throw new java.io.IOException("No se pudo descargar la versión base de Minecraft " + minecraftVersion);
             }
         }
     }
@@ -50,7 +57,10 @@ public class OptiFineDownloadTask implements AsyncMinecraftDownloader.DoneListen
     public boolean downloadMinecraft(String minecraftVersion) {
         // the string is always normalized
         JMinecraftVersionList.Version minecraftJsonVersion = AsyncMinecraftDownloader.getListedVersion(minecraftVersion);
-        if(minecraftJsonVersion == null) return false;
+        if(minecraftJsonVersion == null) {
+            mDownloaderThrowable = new java.io.IOException("No se encontró la versión " + minecraftVersion + " en la lista de versiones oficiales.");
+            return false;
+        }
         try {
             synchronized (mMinecraftDownloadLock) {
                 new MinecraftDownloader().start(null, minecraftJsonVersion, minecraftVersion, this);
@@ -58,6 +68,8 @@ public class OptiFineDownloadTask implements AsyncMinecraftDownloader.DoneListen
             }
         }catch (InterruptedException e) {
             e.printStackTrace();
+            mDownloaderThrowable = e;
+            return false;
         }
         return mDownloaderThrowable == null;
     }

@@ -23,6 +23,8 @@ import net.kdt.pojavlaunch.utils.DownloadUtils;
 import net.kdt.pojavlaunch.utils.JSONUtils;
 import net.kdt.pojavlaunch.utils.NotificationUtils;
 
+import net.kdt.pojavlaunch.multirt.MultiRTUtils;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -91,6 +93,12 @@ public class InstanceInstaller implements ContextExecutorTask {
             if(!lastInstaller.equals(instance.installer)) continue;
             instance.installer = null;
             instance.versionId = targetVersionId;
+            if(targetVersionId.startsWith("1.") && !targetVersionId.startsWith("1.17")
+                    && !targetVersionId.startsWith("1.18") && !targetVersionId.startsWith("1.19")
+                    && !targetVersionId.startsWith("1.20") && !targetVersionId.startsWith("1.21")) {
+                String jre8 = MultiRTUtils.getNearestJreName(8);
+                if(jre8 != null) instance.selectedRuntime = jre8;
+            }
             instance.write();
         }
         ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);

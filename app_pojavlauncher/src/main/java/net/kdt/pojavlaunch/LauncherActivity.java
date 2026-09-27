@@ -4,6 +4,7 @@ import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -61,7 +62,36 @@ public class LauncherActivity extends BaseActivity {
     private final ExtraListener<String> mBackPreferenceListener=(key,value)->{if(value.equals("true"))onBackPressed();return false;};
     private final ExtraListener<Boolean> mSelectAuthMethod=(key,value)->{if(!value)return false;Fragment f=getSupportFragmentManager().findFragmentById(mFragmentView.getId());if(!(f instanceof MainMenuFragment))return false;Tools.swapFragment(this,SelectAuthFragment.class,SelectAuthFragment.TAG,null);return false;};
     private final View.OnClickListener mSettingButtonListener=v->{Fragment f=getSupportFragmentManager().findFragmentById(mFragmentView.getId());if(f instanceof MainMenuFragment)Tools.swapFragment(this,LauncherPreferenceFragment.class,SETTING_FRAGMENT_TAG,null);else Tools.backToMainMenu(this);};
-    private final ExtraListener<Boolean> mLaunchGameListener=(key,value)->{if(mProgressLayout.hasProcesses()){Toast.makeText(this,R.string.tasks_ongoing,Toast.LENGTH_LONG).show();return false;} Instance i=InstanceManager.getSelectedListedInstance();if(i.installer!=null){i.installer.start();return false;}if(!Tools.isValidString(i.versionId)){Toast.makeText(this,R.string.error_no_version,Toast.LENGTH_LONG).show();return false;}if(PojavProfile.getCurrentProfileContent(true)==null){Toast.makeText(this,R.string.no_saved_accounts,Toast.LENGTH_LONG).show();ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD,true);return false;}String id=AsyncMinecraftDownloader.normalizeVersionId(i.versionId);JMinecraftVersionList.Version v=AsyncMinecraftDownloader.getListedVersion(id);int javaVersion=v.javaVersion==null?8:v.javaVersion.majorVersion;if(!FranyuPerformanceGuard.preLaunchCheck(this,i,javaVersion))return false;String safe=FranyuPerformanceGuard.applySafeProfile(this,i);if(safe!=null)Toast.makeText(this,safe,Toast.LENGTH_LONG).show();if(LauncherPreferences.PREF_VERIFY_FILES){java.util.List<FranyuModInspector.Conflict> conflicts=FranyuModInspector.findConflicts(i);if(!conflicts.isEmpty()){new AlertDialog.Builder(this).setTitle("Conflicto de mods").setMessage("Se detectan mods duplicados o con el mismo identificador:\n"+conflicts.get(0).files).setPositiveButton(android.R.string.ok,null).show();return false;}}new MinecraftDownloader().start(this,v,id,new ContextAwareDoneListener(this,id));return false;};
+    private final ExtraListener<Boolean> mLaunchGameListener=(key,value)->{
+        if(mProgressLayout.hasProcesses()){Toast.makeText(this,R.string.tasks_ongoing,Toast.LENGTH_LONG).show();return false;}
+        Instance i=InstanceManager.getSelectedListedInstance();
+        if(i.installer!=null){i.installer.start();return false;}
+        if(!Tools.isValidString(i.versionId)){Toast.makeText(this,R.string.error_no_version,Toast.LENGTH_LONG).show();return false;}
+        if(PojavProfile.getCurrentProfileContent(true)==null){Toast.makeText(this,R.string.no_saved_accounts,Toast.LENGTH_LONG).show();ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD,true);return false;}
+        String id=AsyncMinecraftDownloader.normalizeVersionId(i.versionId);
+        JMinecraftVersionList.Version v=AsyncMinecraftDownloader.getListedVersion(id);
+        int javaVersion = 8;
+        if(v != null && v.javaVersion != null) {
+            javaVersion = v.javaVersion.majorVersion;
+        } else if(id != null) {
+            if(id.contains("1.17")) javaVersion = 17;
+            else if(id.contains("1.18") || id.contains("1.19") || id.contains("1.20.1") || id.contains("1.20.2") || id.contains("1.20.3") || id.contains("1.20.4")) javaVersion = 17;
+            else if(id.contains("1.20.") || id.contains("1.21")) javaVersion = 21;
+            else javaVersion = 8;
+        }
+        if(!FranyuPerformanceGuard.preLaunchCheck(this,i,javaVersion))return false;
+        String safe=FranyuPerformanceGuard.applySafeProfile(this,i);
+        if(safe!=null)Toast.makeText(this,safe,Toast.LENGTH_LONG).show();
+        if(LauncherPreferences.PREF_VERIFY_FILES){
+            java.util.List<FranyuModInspector.Conflict> conflicts=FranyuModInspector.findConflicts(i);
+            if(!conflicts.isEmpty()){
+                new AlertDialog.Builder(this).setTitle("Conflicto de mods").setMessage("Se detectan mods duplicados o con el mismo identificador:\n"+conflicts.get(0).files).setPositiveButton(android.R.string.ok,null).show();
+                return false;
+            }
+        }
+        new MinecraftDownloader().start(this,v,id,new ContextAwareDoneListener(this,id));
+        return false;
+    };
     private final TaskCountListener mDoubleLaunchPreventionListener=taskCount->{if(taskCount>0)Tools.runOnUiThread(()->mNotificationManager.cancel(NotificationUtils.NOTIFICATION_ID_GAME_START));return false;};
     private ActivityResultLauncher<String> mRequestNotificationPermissionLauncher;
     private WeakReference<Runnable> mRequestNotificationPermissionRunnable;
@@ -71,6 +101,7 @@ public class LauncherActivity extends BaseActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         setContentView(R.layout.activity_pojav_launcher);
         bindViews();
         mUpdateStartupGate=new UpdateStartupGate(this);
@@ -103,7 +134,12 @@ public class LauncherActivity extends BaseActivity {
         mStartupGateFinished=true;
     }
 
-    @Override protected void onResume(){super.onResume();ContextExecutor.setActivity(this);InstanceInstaller.postInstallCheck(this);}
+    @Override protected void onResume(){
+        super.onResume();
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        ContextExecutor.setActivity(this);
+        InstanceInstaller.postInstallCheck(this);
+    }
     @Override protected void onPause(){super.onPause();ContextExecutor.clearActivity();}
     @Override protected void onStart(){super.onStart();getSupportFragmentManager().registerFragmentLifecycleCallbacks(mFragmentCallbackListener,true);}
     @Override protected void onDestroy(){
