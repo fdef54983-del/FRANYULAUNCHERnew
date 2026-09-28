@@ -1,6 +1,5 @@
 package net.kdt.pojavlaunch.tasks;
 
-
 import static net.kdt.pojavlaunch.Architecture.archAsString;
 import static net.kdt.pojavlaunch.PojavApplication.sExecutorService;
 
@@ -21,10 +20,60 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class AsyncAssetManager {
 
+    private static volatile Future<?> sComponentsFuture = null;
+    private static volatile Future<?> sSingleFilesFuture = null;
+    private static final Object sUnpackLock = new Object();
+
     private AsyncAssetManager(){}
+
+    /**
+     * Retrieves the Future tracking the background components unpacking process.
+     * @return Future or null if not yet initiated
+     */
+    public static Future<?> getComponentsUnpackFuture() {
+        return sComponentsFuture;
+    }
+
+    /**
+     * Retrieves the Future tracking the single files unpacking process.
+     * @return Future or null if not yet initiated
+     */
+    public static Future<?> getSingleFilesUnpackFuture() {
+        return sSingleFilesFuture;
+    }
+
+    /**
+     * Waits for component unpacking to finish with the specified timeout.
+     */
+    public static void waitForComponentsUnpack(long timeout, TimeUnit unit) {
+        Future<?> future = sComponentsFuture;
+        if (future != null) {
+            try {
+                future.get(timeout, unit);
+            } catch (Exception e) {
+                Log.e("AsyncAssetManager", "Timeout or error waiting for components unpack", e);
+            }
+        }
+    }
+
+    /**
+     * Waits for single files unpacking to finish with the specified timeout.
+     */
+    public static void waitForSingleFilesUnpack(long timeout, TimeUnit unit) {
+        Future<?> future = sSingleFilesFuture;
+        if (future != null) {
+            try {
+                future.get(timeout, unit);
+            } catch (Exception e) {
+                Log.e("AsyncAssetManager", "Timeout or error waiting for single files unpack", e);
+            }
+        }
+    }
 
     /**
      * Attempt to install the java 8 runtime, if necessary
@@ -61,23 +110,25 @@ public class AsyncAssetManager {
     }
 
     /** Unpack single files, with no regard to version tracking */
-    public static void unpackSingleFiles(Context ctx){
+    public static Future<?> unpackSingleFiles(Context ctx){
         ProgressLayout.setProgress(ProgressLayout.EXTRACT_SINGLE_FILES, 0);
-        sExecutorService.execute(() -> {
+        Future<?> future = sExecutorService.submit(() -> {
             try {
                 Tools.copyAssetFile(ctx, "default.json", Tools.CTRLMAP_PATH, false);
                 Tools.copyAssetFile(ctx, "launcher_profiles.json", Tools.DIR_GAME_NEW, false);
                 Tools.copyAssetFile(ctx,"resolv.conf",Tools.DIR_DATA, false);
             } catch (IOException e) {
-                Log.e("AsyncAssetManager", "Failed to unpack critical components !");
+                Log.e("AsyncAssetManager", "Failed to unpack critical components !", e);
             }
             ProgressLayout.clearProgress(ProgressLayout.EXTRACT_SINGLE_FILES);
         });
+        sSingleFilesFuture = future;
+        return future;
     }
 
-    public static void unpackComponents(Context ctx){
+    public static Future<?> unpackComponents(Context ctx){
         ProgressLayout.setProgress(ProgressLayout.EXTRACT_COMPONENTS, 0);
-        sExecutorService.execute(() -> {
+        Future<?> future = sExecutorService.submit(() -> {
             tryUnpackComponent(ctx, "caciocavallo", false);
             tryUnpackComponent(ctx, "caciocavallo17", false);
             tryUnpackComponent(ctx, "lwjgl3", false);
@@ -88,6 +139,8 @@ public class AsyncAssetManager {
             tryUnpackComponent(ctx, "authlib-injector", true);
             ProgressLayout.clearProgress(ProgressLayout.EXTRACT_COMPONENTS);
         });
+        sComponentsFuture = future;
+        return future;
     }
 
     private static String readInstalledComponentVersion(File componentRoot) {
@@ -123,39 +176,73 @@ public class AsyncAssetManager {
     }
 
     private static void unpackComponentInternal(Context ctx, String component, boolean privateDirectory, boolean force) throws IOException {
-        AssetManager am = ctx.getAssets();
-        String rootDir = privateDirectory ? Tools.DIR_DATA : Tools.DIR_GAME_HOME;
-        File componentTarget = new File(rootDir, component);
-        String installedVersion = readInstalledComponentVersion(componentTarget);
-        String builtinVersion = readBuiltinComponentVersion(am, component);
-        if(!force && installedVersion != null && installedVersion.equals(builtinVersion)) {
-            Log.i("AssetUnpacker", "Component "+component+" is up-to-date, continuing...");
-            return;
-        }
-        Log.i("AssetUnpacker", (force ? "Force updating " : "Updating ") + component);
-
-        if(componentTarget.exists()) {
-            FileUtils.deleteDirectory(componentTarget);
-        }
-        if(!componentTarget.mkdirs()) {
-            throw new IOException("Failed to create directory for "+component);
-        }
-
-        String componentSource = "components/" + component;
-
-        String[] fileList = am.list(componentSource);
-        if (fileList != null) {
-            for (String fileName : fileList) {
-                if(fileName.equals("version")) continue;
-                String sourcePath = componentSource + "/" + fileName;
-                Tools.copyAssetFile(ctx, sourcePath, componentTarget.getAbsolutePath(), true);
+        synchronized (sUnpackLock) {
+            AssetManager am = ctx.getAssets();
+            String rootDir = privateDirectory ? Tools.DIR_DATA : Tools.DIR_GAME_HOME;
+            File componentTarget = new File(rootDir, component);
+            String installedVersion = readInstalledComponentVersion(componentTarget);
+            String builtinVersion = readBuiltinComponentVersion(am, component);
+            if(!force && installedVersion != null && installedVersion.equals(builtinVersion)) {
+                Log.i("AssetUnpacker", "Component "+component+" is up-to-date, continuing...");
+                return;
             }
-        }
+            Log.i("AssetUnpacker", (force ? "Force updating " : "Updating ") + component);
 
-        // Always write the version file separately after extracting everything else, to improve
-        // reliability.
-        if (builtinVersion != null) {
-            Tools.write(componentTarget.getAbsolutePath()+"/version", builtinVersion);
+            // Extract to temporary directory first to prevent race conditions and partial reads
+            File tmpTarget = new File(rootDir, component + "_tmp_" + System.currentTimeMillis());
+            if (tmpTarget.exists()) {
+                FileUtils.deleteQuietly(tmpTarget);
+            }
+            if (!tmpTarget.mkdirs()) {
+                throw new IOException("Failed to create temporary directory for " + component + " at " + tmpTarget.getAbsolutePath());
+            }
+
+            try {
+                String componentSource = "components/" + component;
+                String[] fileList = am.list(componentSource);
+                if (fileList != null) {
+                    for (String fileName : fileList) {
+                        if(fileName.equals("version")) continue;
+                        String sourcePath = componentSource + "/" + fileName;
+                        Tools.copyAssetFile(ctx, sourcePath, tmpTarget.getAbsolutePath(), true);
+                    }
+                }
+
+                // Write the version file into the temp directory before atomic swap
+                if (builtinVersion != null) {
+                    Tools.write(new File(tmpTarget, "version").getAbsolutePath(), builtinVersion);
+                }
+
+                // Atomic replacement: rename existing componentTarget to backup, then rename tmpTarget to componentTarget
+                File oldTarget = new File(rootDir, component + "_old_" + System.currentTimeMillis());
+                boolean renamedExisting = false;
+                if (componentTarget.exists()) {
+                    renamedExisting = componentTarget.renameTo(oldTarget);
+                    if (!renamedExisting) {
+                        // Fallback if rename of existing directory failed: delete componentTarget
+                        FileUtils.deleteDirectory(componentTarget);
+                    }
+                }
+
+                boolean moved = tmpTarget.renameTo(componentTarget);
+                if (!moved) {
+                    // Fallback if rename failed across filesystems: copy directory
+                    FileUtils.copyDirectory(tmpTarget, componentTarget);
+                    FileUtils.deleteQuietly(tmpTarget);
+                }
+
+                if (renamedExisting && oldTarget.exists()) {
+                    FileUtils.deleteQuietly(oldTarget);
+                }
+            } catch (Exception e) {
+                // If any error occurred during extraction, delete temp directory
+                FileUtils.deleteQuietly(tmpTarget);
+                if (e instanceof IOException) {
+                    throw (IOException) e;
+                } else {
+                    throw new IOException("Failed to unpack component " + component, e);
+                }
+            }
         }
     }
 

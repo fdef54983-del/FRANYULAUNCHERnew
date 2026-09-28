@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
 import java.util.TimeZone;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -396,6 +398,27 @@ public class JavaRunner {
      * Start the Java(tm) Virtual Machine with Context awareness for asset auto-recovery.
      */
     public static void startJvm(Context context, Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs) throws VMLoadException{
+        // Ensure background component extraction (caciocavallo, lwjgl3, etc.) has finished before starting JVM
+        Future<?> componentsFuture = AsyncAssetManager.getComponentsUnpackFuture();
+        if (componentsFuture != null) {
+            try {
+                Log.i(TAG, "Waiting for component extraction to complete before JVM initialization...");
+                componentsFuture.get(45, TimeUnit.SECONDS);
+                Log.i(TAG, "Component extraction completed successfully.");
+            } catch (Exception e) {
+                Log.e(TAG, "Timeout or error waiting for components unpack", e);
+            }
+        }
+
+        Future<?> singleFilesFuture = AsyncAssetManager.getSingleFilesUnpackFuture();
+        if (singleFilesFuture != null) {
+            try {
+                singleFilesFuture.get(15, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                Log.e(TAG, "Timeout or error waiting for single files unpack", e);
+            }
+        }
+
         File runtimeHomeDir = MultiRTUtils.getRuntimeHome(runtime.name);
         File vmPath = findVmPath(runtimeHomeDir, runtime.arch);
         if(vmPath == null) {
