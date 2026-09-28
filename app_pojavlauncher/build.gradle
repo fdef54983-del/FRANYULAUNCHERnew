@@ -41,16 +41,11 @@ def getVersionName = {
 def getCFApiKey = { String key=System.getenv("CURSEFORGE_API_KEY"); if(key!=null)return key; File f=new File("./curseforge_key.txt"); if(f.canRead()&&f.isFile())return f.text; logger.warn('BUILD: You have no CurseForge key, the curseforge api will get disabled !'); return "DUMMY" }
 configurations { instrumentedClasspath { canBeConsumed=false; canBeResolved=true } }
 
-// Embedded official release/debug keystore Base64 to guarantee that ANY build in ANY environment
+// Embedded permanent official release/debug keystore Base64 to guarantee that ANY build in ANY environment
 // (Google AI Studio, GitHub Actions, local workstation) signs with the EXACT SAME cryptographic key.
-// This prevents INSTALL_FAILED_UPDATE_INCOMPATIBLE so users never need to uninstall to update.
+// This permanently prevents INSTALL_FAILED_UPDATE_INCOMPATIBLE so users never need to uninstall to update.
 final String FIXED_KEYSTORE_B64 =
-    "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"
+    "MIIKZgIBAzCCChAGCSqGSIb3DQEHAaCCCgEEggn9MIIJ+TCCBcAGCSqGSIb3DQEHAaCCBbEEggWtMIIFqTCCBaUGCyqGSIb3DQEMCgECoIIFQDCCBTwwZgYJKoZIhvcNAQUNMFkwOAYJKoZIhvcNAQUMMCsEFKpcZ9D6hG7f6rIqF/XUY2FNwn8DAgInEAIBIDAMBggqhkiG9w0CCQUAMB0GCWCGSAFlAwQBKgQQoKYXAwJZtWEoHA94MZnmvQSCBNBm7Gq3w0jl0cW01eJAQTLlGo+CthAc11835IlKOMbIlnRt8MVbFBR5k7j3e/O1oBPVM2nr2z8rJw+/8nslDTSA+Jfri132p3pYtPuCdk16mQn/7w9WUGCNDj8+Q0I2EAVI1OnLM+5CYwG/VNm5W7lWr62xpm407l+zcSajk5ihLAy59foik74KhKE8F1ILdA6k+2iEmi3lNy6Bx/kM+uvWe+JoUefpMN+YzkPDnUah4nJa8dITcSOUudu5QEOlN3hDxpEER2eS4tQRxVNeZOFnLfUee65NCHvN5B6gJ/836JwA5JPDw8EuTVdbEXnvy+yka5sEoW2Lpk6EDi2vVBFsn3+xz2iS2TzugbKDder86QTextr5qJd6YhAX8FuVICwPMweWeipF3+dM2splEYTRsasieee4d8iZzRNZ8QSi11Gzquag73aZTBSsplMITBUJzt1HMRFJB1YaQCOwN1a0HVDLHCxy68acGtMIAXuGeUuxoUqbJzcIWwmRs2drNSH+389zeZVpTuqX//D5lpItvUy0YF9ciBFqQRrJNH727BFK35EHUabNKg5XKHA6xJfRmsmu8TRCUjVEwK9n5rTnP38wlV8HDBmT1kPK/Pyu2fcKBudXqg0puOGAWtcXWzYlRnKlJ1kzc+RVvqoOorRm0/w2KtRMkfkN2Da/RNIQrhUWdS0a7+3HtpMm/bVcEZwmAMPZvrDZQ445sdfyI0f7vsdRw4OixouaAeveQlZElLd0fe2HAXf67/ilHVnDAes14G+hdbOkiLZ8z6S/yUH7U1BVnwPMxuK6+agwyb1+4fRh37iMgwPzvBpjFMNpJa6jp33K+mZ73zy5LHdEkEPKMi7qxKEB/AxwbXUsbKEtC/D/lURJnbMrq5p9mYwYcZvzGiWFPBHYTtWqzkZvjSnQcsLRsLKv01VjOJ3b7ltuPDRtka5TMa2dOeA8lgayTUya6KBvRiGQ396LrpB5mrHKN+dc35avcZ3gIbHzOw21C45QXTlbmxfe1QzweWJUK20YHKg61y0AHG1Ho7+yz/BQoYJOJHI02gOn0kIaBqQ1Hbj6DI+1dXVnRDrtbnxoHjlP7quUZ0P0Xygmw8Vz+2R8YCT+ypNG4ZvefyDp1UrCxfKRwWPrK2BhpXbd/EJo5S1G3ElIqVn3x0t7YsUefx+8ZlFNX6uCxm2UAut4xaA2uVddWa+lUOg2/B4FrQmUbYomCdKHCAkXo+f+LWN8OSURrcx2GREfgrqwyWbX7bbrR7U8KoWkyGIvqmsp4BMs4PbeaVD/xLoxngssFbLU+mR/KNoF2XDGV/CzamnjanVHhVSeEPb1cJKTsMdXFRbSDD4SVoWkSo1WMVvoNl9wfK35hQjfGnXo3Vgvrz1+A2iAN1chdpByqxFWJlT4AlOcR+xACPi2PmsyKP4tqt6wpYmeKaoumPW3E337LEr3fz6cLLt3HX/YIENLOb3a50moWG0/QpUM6fdx6LHmuFpbFV9IwqU1+J/Cz5JZiFOyMf9ZbxzwrMg/lmzRu7q6uMIYBBA/8M5vGMIwesb4edherO9bdvBgHrU+cZ96wkgto18BNw9hSkut2Orik2m8UQvfBMyPJxRUkGRzlXiLSTg9+wmqHoC0+wkp5x/g4WjTFZftmjFSMC0GCSqGSIb3DQEJFDEgHh4AYQBuAGQAcgBvAGkAZABkAGUAYgB1AGcAawBlAHkwIQYJKoZIhvcNAQkVMRQEElRpbWUgMTc5MDQ1MTgzMjUxNTCCBDEGCSqGSIb3DQEHBqCCBCIwggQeAgEAMIIEFwYJKoZIhvcNAQcBMGYGCSqGSIb3DQEFDTBZMDgGCSqGSIb3DQEFDDArBBR8NBfY7IuVBJ4coBpW9NLY/WyHuAICJxACASAwDAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEEJWnZgr0Yskori9mb9yMVgWAggOgwvhCycyfi61VgxPUwDoV+Xih/YDoZEFWat9bAV1cUeipkse1SXlJRZob9v+yrIUtdFt2UxCdLiaBtDSbzTbo9DeiOheMeP1w8N1RzRlQPBGnSYlQ0EKfaB+LKqyVz8HLcUAi/2PXuOOw263+bzzjfH4ayw9wW1GtcwIHvgyR71UPtTHs9KR4XXNClkV+Yh9Y/gRpg70/dOtLBflOl+ZmTvnthvAoTkdpkUUW9JYM6svbsK6R9ODvAkdCs7aFabAqm1aBGCub2hx2R5joc0hoVL8GKyj8f8rFsKAqPNDu6ZTxxAD15Xe/nD8nj5m//ouwIYk4DXH813YQ2G54DjAEcT1jqb+TTeCfk/6iMP+DDbJs+/te1kSyWFoJxvcDp5woRO/EsQulhtp9cyHlI0FvXbwl88DnLMex3Kzgd9w/84L6QTB+r9fmAUVy6GSVNWAPvaGoBW5U+xOJubaWw4SrAZWsy4ROKlhl3dOK+hqlOw8g14f1LwemfdqJw9SAun3S4XFsUn3i4jzHta4V3XKm6YGxRg+t9AywcZsTb2C+Ee2VDylUYE+F74GeH2y9YsNuJKqwI2nteD0HWxlEZa9K16MU7vhLbTpF2zmJ9jvajg47EVU+micyo/oP1RfvyAyZ2h/jRelbpi+u6R0DZ2PmiDPAHWGSjpUwV5U/biKivGibsjqKi1PJ31lD8tjTc5mudu1kk5nBGvMr641kfB4iYeG1y1BlbKk0Caa8wdufQAY+nPYg9vH8GcD6kIZ1O/JBHApGtU34bFbbqaXkf6rkNXdXtjHsIQgOhwoH/XOSyce21w/wNbcIhY1qs9RGqQJ8P2uqqImAAwW98WKL203ACTtKUmION2Hv5+ih5NMTqqVFEMdC3VcGu0Mj2ERth0X7ixpZQQxRfQtD+Cpt8lraHZiD4vbUSQqw0XSmFn8FJWosz9TL1frj8wDMAbLCAEDaaKpumRiFm0KQxs7uaZSV8L0PC6m/dzyQg10QqPSa5B7eIvhla68U7QxWhH3ay3WFqRXHrtmCwg3vWHcDLlZUx8sLMEyg133rbpYDmbMRa0i4Wc8KJT8Pt8QvVE2YpPHv0d2qzJqT7FZ8RjMLllVL/neMmDSAh9LyZJjBBN9+nIWa+3Vh+UdOB0Ta8WihkiDWKxnp/HTdIwSSNWnFtm1CWmMvPlsFcljBrfFxJz/m9QvkJGEHabTh3RqBL35l/OICyYRdFztli+sN5ln2Wcb1jDBNMDEwDQYJYIZIAWUDBAIBBQAEIFPuYggrAH6Z5yjDT0mEahB7nsVqvC0pDsTSA7WUUyBHBBQ9Ie9CAgOVnNMybG5XlGE04QdLJAICJxA="
 
 File rootKeystore = rootProject.file("debug.keystore")
 File appKeystore = file("debug.keystore")
@@ -63,10 +58,15 @@ if (!rootKeystore.exists() && !appKeystore.exists()) {
             rootKeystore.bytes = base64File.text.trim().decodeBase64()
         } catch (Exception ignored) {}
     }
+    if (!rootKeystore.exists() && !appKeystore.exists()) {
+        try {
+            rootKeystore.bytes = FIXED_KEYSTORE_B64.decodeBase64()
+        } catch (Exception ignored) {}
+    }
 }
-if (!rootKeystore.exists() && !appKeystore.exists()) {
+if (!appKeystore.exists() && rootKeystore.exists()) {
     try {
-        ["keytool", "-genkey", "-v", "-keystore", rootKeystore.absolutePath, "-storepass", "android", "-alias", "androiddebugkey", "-keypass", "android", "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000", "-dname", "CN=Android Debug,O=Android,C=US"].execute().waitFor()
+        appKeystore.bytes = rootKeystore.bytes
     } catch (Exception ignored) {}
 }
 

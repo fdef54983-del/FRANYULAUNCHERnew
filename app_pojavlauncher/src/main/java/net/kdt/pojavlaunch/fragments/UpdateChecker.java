@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -28,6 +29,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -49,33 +51,9 @@ public class UpdateChecker implements AutoCloseable {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private volatile boolean closed;
 
-    public static final class Update {
-        public final String version;
-        public final String body;
-        public final String apkUrl;
-        public final long size;
-        public final String releaseUpdatedAt;
-        public final String assetUpdatedAt;
-        public final boolean isSameVersionPatch;
-
-        public Update(String version, String body, String apkUrl, long size,
-                      String releaseUpdatedAt, String assetUpdatedAt, boolean isSameVersionPatch) {
-            this.version = version;
-            this.body = body;
-            this.apkUrl = apkUrl;
-            this.size = size;
-            this.releaseUpdatedAt = releaseUpdatedAt;
-            this.assetUpdatedAt = assetUpdatedAt;
-            this.isSameVersionPatch = isSameVersionPatch;
-        }
-
-        public String getUniqueFingerprint() {
-            return version + "#" + releaseUpdatedAt + "#" + assetUpdatedAt;
-        }
-    }
-
+    @FunctionalInterface
     public interface Callback {
-        void onResult(Update update);
+        void onUpdate(Update update);
     }
 
     public interface DownloadProgressCallback {
@@ -84,212 +62,159 @@ public class UpdateChecker implements AutoCloseable {
         void onError(Exception e);
     }
 
-    public UpdateChecker(Context context) {
-        this.context = context.getApplicationContext();
-        ensureLocalBuildBaseline();
+    public static class Update {
+        public final String version;
+        public final String apkUrl;
+        public final String releaseUpdatedAt;
+        public final String assetUpdatedAt;
+        public final String body;
+        public final long size;
+        public final boolean isSameVersionPatch;
+
+        public Update(String version, String apkUrl, String releaseUpdatedAt,
+                      String assetUpdatedAt, String body, long size, boolean isSameVersionPatch) {
+            this.version = version;
+            this.apkUrl = apkUrl;
+            this.releaseUpdatedAt = releaseUpdatedAt == null ? "" : releaseUpdatedAt;
+            this.assetUpdatedAt = assetUpdatedAt == null ? "" : assetUpdatedAt;
+            this.body = body;
+            this.size = size;
+            this.isSameVersionPatch = isSameVersionPatch;
+        }
+
+        public String getFingerprint() {
+            return version + "#" + releaseUpdatedAt + "#" + assetUpdatedAt;
+        }
     }
 
-    private void ensureLocalBuildBaseline() {
+    public UpdateChecker(Context context) {
+        this.context = context.getApplicationContext();
+        syncInstalledBuildMetadata();
+    }
+
+    private void syncInstalledBuildMetadata() {
         SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String savedBuild = sp.getString(KEY_CURRENT_INSTALLED_BUILD, "");
-        String currentBuild = (BuildConfig.VERSION_NAME != null ? BuildConfig.VERSION_NAME : "")
-                + "_" + BuildConfig.VERSION_CODE;
-        if (!currentBuild.equals(savedBuild)) {
+        String savedInstalled = sp.getString(KEY_CURRENT_INSTALLED_BUILD, "");
+        String currentInstalled = BuildConfig.VERSION_NAME == null ? "" : BuildConfig.VERSION_NAME;
+        if (!currentInstalled.equals(savedInstalled)) {
             sp.edit()
-                    .putString(KEY_CURRENT_INSTALLED_BUILD, currentBuild)
+                    .putString(KEY_CURRENT_INSTALLED_BUILD, currentInstalled)
+                    .remove(KEY_LAST_SEEN_RELEASE_UPDATED)
+                    .remove(KEY_LAST_SEEN_ASSET_UPDATED)
+                    .remove(KEY_PENDING_APK)
                     .apply();
         }
     }
 
     public void check(Callback callback) {
         executor.execute(() -> {
-            Update update = null;
-            HttpURLConnection connection = null;
             try {
-                connection = (HttpURLConnection) new URL(RELEASES_URL).openConnection();
-                connection.setConnectTimeout(8000);
-                connection.setReadTimeout(12000);
-                connection.setRequestProperty("Accept", "application/vnd.github+json");
-                connection.setRequestProperty("User-Agent", "FranyuLauncher/1.5");
-                if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    StringBuilder json = new StringBuilder();
-                    try (InputStream in = connection.getInputStream()) {
-                        byte[] buffer = new byte[4096];
-                        int n;
-                        while ((n = in.read(buffer)) != -1) {
-                            json.append(new String(buffer, 0, n, "UTF-8"));
-                        }
-                    }
-                    JsonObject release = new JsonParser().parse(json.toString()).getAsJsonObject();
-                    String tag = release.has("tag_name") && !release.get("tag_name").isJsonNull()
-                            ? release.get("tag_name").getAsString() : "";
-                    String version = tag.startsWith("v") ? tag.substring(1) : tag;
-                    String installed = BuildConfig.VERSION_NAME == null ? "" : BuildConfig.VERSION_NAME;
+                HttpURLConnection c = (HttpURLConnection) new URL(RELEASES_URL).openConnection();
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(15000);
+                c.setRequestProperty("User-Agent", "FranyuLauncher/1.5");
+                c.setRequestProperty("Accept", "application/vnd.github.v3+json");
 
-                    String releaseUpdatedAt = getStringField(release, "updated_at");
-                    if (releaseUpdatedAt.isEmpty()) {
-                        releaseUpdatedAt = getStringField(release, "published_at");
-                    }
+                int code = c.getResponseCode();
+                if (code != HttpURLConnection.HTTP_OK) {
+                    throw new java.io.IOException("HTTP " + code + " fetching releases");
+                }
 
-                    ApkAsset asset = findCompatibleApk(release);
-                    if (asset != null) {
-                        String assetUpdatedAt = asset.updatedAt;
-                        if (assetUpdatedAt.isEmpty()) {
-                            assetUpdatedAt = releaseUpdatedAt;
-                        }
+                String json;
+                try (InputStream in = c.getInputStream()) {
+                    json = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                } finally {
+                    c.disconnect();
+                }
 
-                        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-                        String skipped = sp.getString(KEY_SKIPPED, "");
-                        String lastSeenReleaseUpdated = sp.getString(KEY_LAST_SEEN_RELEASE_UPDATED, "");
-                        String lastSeenAssetUpdated = sp.getString(KEY_LAST_SEEN_ASSET_UPDATED, "");
+                if (closed) return;
 
-                        boolean newerVersion = isNewer(version, installed);
-                        boolean sameVersion = isSameOrEquivalentVersion(version, installed);
+                JsonObject release = JsonParser.parseString(json).getAsJsonObject();
+                if (release.has("draft") && release.get("draft").getAsBoolean()) {
+                    notifyUpToDate(callback);
+                    return;
+                }
 
-                        boolean contentChanged = false;
-                        if (!releaseUpdatedAt.isEmpty() && !releaseUpdatedAt.equals(lastSeenReleaseUpdated)) {
-                            contentChanged = true;
-                        }
-                        if (!assetUpdatedAt.isEmpty() && !assetUpdatedAt.equals(lastSeenAssetUpdated)) {
-                            contentChanged = true;
-                        }
+                String tag = release.has("tag_name") ? release.get("tag_name").getAsString() : "";
+                String version = tag.startsWith("v") ? tag.substring(1) : tag;
+                String releaseUpdatedAt = release.has("updated_at")
+                        ? release.get("updated_at").getAsString()
+                        : (release.has("published_at") ? release.get("published_at").getAsString() : "");
 
-                        boolean shouldNotify = false;
-                        boolean isSameVersionPatch = false;
+                String body = release.has("body") && !release.get("body").isJsonNull()
+                        ? release.get("body").getAsString() : "";
 
-                        if (newerVersion) {
-                            shouldNotify = true;
-                            isSameVersionPatch = false;
-                        } else if (sameVersion && contentChanged) {
-                            shouldNotify = true;
-                            isSameVersionPatch = true;
-                        }
+                String installed = BuildConfig.VERSION_NAME == null ? "" : BuildConfig.VERSION_NAME;
 
-                        String candidateFingerprint = version + "#" + releaseUpdatedAt + "#" + assetUpdatedAt;
-                        if (shouldNotify && !candidateFingerprint.equals(skipped) && !version.equals(skipped)) {
-                            update = new Update(
-                                    version,
-                                    release.has("body") && !release.get("body").isJsonNull()
-                                            ? release.get("body").getAsString() : "",
-                                    asset.url,
-                                    asset.size,
-                                    releaseUpdatedAt,
-                                    assetUpdatedAt,
-                                    isSameVersionPatch
-                            );
+                SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                String skippedFingerprint = sp.getString(KEY_SKIPPED, "");
+                String lastSeenReleaseUpdated = sp.getString(KEY_LAST_SEEN_RELEASE_UPDATED, "");
+                String lastSeenAssetUpdated = sp.getString(KEY_LAST_SEEN_ASSET_UPDATED, "");
+
+                JsonArray assets = release.has("assets") ? release.getAsJsonArray("assets") : null;
+                String apkUrl = null;
+                String assetUpdatedAt = "";
+                long size = 0;
+                if (assets != null) {
+                    for (JsonElement e : assets) {
+                        JsonObject a = e.getAsJsonObject();
+                        String name = a.has("name") ? a.get("name").getAsString() : "";
+                        if (name.endsWith(".apk") && !name.contains("noruntime")) {
+                            apkUrl = a.get("browser_download_url").getAsString();
+                            size = a.has("size") ? a.get("size").getAsLong() : 0;
+                            if (a.has("updated_at") && !a.get("updated_at").isJsonNull()) {
+                                assetUpdatedAt = a.get("updated_at").getAsString();
+                            }
+                            break;
                         }
                     }
                 }
+
+                if (apkUrl != null) {
+                    boolean newerVersion = isNewer(version, installed);
+                    boolean sameVersion = isSameOrEquivalentVersion(version, installed);
+
+                    boolean assetModified = !assetUpdatedAt.isEmpty()
+                            && !assetUpdatedAt.equals(lastSeenAssetUpdated);
+                    boolean releaseModified = !releaseUpdatedAt.isEmpty()
+                            && !releaseUpdatedAt.equals(lastSeenReleaseUpdated);
+
+                    boolean contentChangedOnSameVersion = sameVersion && (assetModified || releaseModified);
+
+                    if (newerVersion || contentChangedOnSameVersion) {
+                        boolean isSameVersionPatch = sameVersion && !newerVersion;
+                        Update update = new Update(version, apkUrl, releaseUpdatedAt,
+                                assetUpdatedAt, body, size, isSameVersionPatch);
+
+                        if (!update.getFingerprint().equals(skippedFingerprint)) {
+                            notifyFound(callback, update);
+                            return;
+                        }
+                    }
+                }
+                notifyUpToDate(callback);
             } catch (Exception e) {
-                Log.w(TAG, "Failed to check for updates: " + e.getMessage());
-            } finally {
-                if (connection != null) connection.disconnect();
-            }
-            Update result = update;
-            if (!closed) {
-                main.post(() -> {
-                    if (!closed && callback != null) callback.onResult(result);
-                });
+                notifyError(callback, e);
             }
         });
     }
 
-    private static String getStringField(JsonObject obj, String field) {
-        if (obj != null && obj.has(field) && !obj.get(field).isJsonNull()) {
-            try {
-                return obj.get(field).getAsString();
-            } catch (Exception ignored) {}
-        }
-        return "";
+    private void notifyFound(Callback cb, Update u) {
+        if (!closed && cb != null) main.post(() -> cb.onUpdate(u));
     }
 
-    private static class ApkAsset {
-        final String url;
-        final long size;
-        final String updatedAt;
-
-        ApkAsset(String url, long size, String updatedAt) {
-            this.url = url;
-            this.size = size;
-            this.updatedAt = updatedAt != null ? updatedAt : "";
-        }
+    private void notifyUpToDate(Callback cb) {
+        if (!closed && cb != null) main.post(() -> cb.onUpdate(null));
     }
 
-    private ApkAsset findCompatibleApk(JsonObject release) {
-        if (!release.has("assets") || !release.get("assets").isJsonArray()) return null;
-        JsonArray assets = release.getAsJsonArray("assets");
-        ApkAsset fallback = null;
-        for (int i = 0; i < assets.size(); i++) {
-            JsonElement el = assets.get(i);
-            if (!el.isJsonObject()) continue;
-            JsonObject asset = el.getAsJsonObject();
-            if (!asset.has("name") || !asset.has("browser_download_url")) continue;
-            String name = asset.get("name").getAsString();
-            String lower = name.toLowerCase();
-            if (!lower.endsWith(".apk")) continue;
-            if (lower.contains("noruntime")) continue;
-
-            String url = asset.get("browser_download_url").getAsString();
-            long size = asset.has("size") ? asset.get("size").getAsLong() : 0L;
-            String updatedAt = getStringField(asset, "updated_at");
-
-            if (lower.contains("franyulauncher")) {
-                return new ApkAsset(url, size, updatedAt);
-            }
-            if (fallback == null) {
-                fallback = new ApkAsset(url, size, updatedAt);
-            }
-        }
-        return fallback;
-    }
-
-    public static boolean isSameOrEquivalentVersion(String remote, String installed) {
-        if (remote == null || installed == null) return false;
-        int[] r = numbers(remote);
-        int[] i = numbers(installed);
-        int len = Math.max(r.length, i.length);
-        for (int n = 0; n < len; n++) {
-            int rv = n < r.length ? r[n] : 0;
-            int iv = n < i.length ? i[n] : 0;
-            if (rv != iv) return false;
-        }
-        return true;
-    }
-
-    public static boolean isNewer(String remote, String installed) {
-        if (remote == null || remote.trim().isEmpty()) return false;
-        if (installed == null || installed.trim().isEmpty() || installed.startsWith("LOCAL-")) return true;
-        int[] r = numbers(remote);
-        int[] i = numbers(installed);
-        for (int n = 0; n < Math.max(r.length, i.length); n++) {
-            int rv = n < r.length ? r[n] : 0;
-            int iv = n < i.length ? i[n] : 0;
-            if (rv != iv) return rv > iv;
-        }
-        return false;
-    }
-
-    private static int[] numbers(String value) {
-        if (value == null) return new int[]{0};
-        String[] segments = value.split("[-_]");
-        String base = segments[0].replaceAll("[^0-9.]", "");
-        if (base.isEmpty()) return new int[]{0};
-        String[] parts = base.split("\\.");
-        int[] result = new int[parts.length];
-        for (int n = 0; n < parts.length; n++) {
-            try {
-                result[n] = Integer.parseInt(parts[n]);
-            } catch (NumberFormatException e) {
-                result[n] = 0;
-            }
-        }
-        return result;
+    private void notifyError(Callback cb, Exception e) {
+        if (!closed && cb != null) main.post(() -> cb.onUpdate(null));
     }
 
     public void skipUpdate(Update update) {
         if (update == null) return;
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putString(KEY_SKIPPED, update.getUniqueFingerprint())
+                .putString(KEY_SKIPPED, update.getFingerprint())
                 .apply();
     }
 
@@ -375,14 +300,12 @@ public class UpdateChecker implements AutoCloseable {
 
     private void validateApk(File apk) throws Exception {
         if (!apk.isFile() || !apk.canRead() || apk.length() < 1024L) {
-            throw new java.io.IOException("El archivo APK está incompleto.");
+            throw new java.io.IOException("El archivo APK está incompleto o dañado.");
         }
         PackageManager pm = context.getPackageManager();
-        PackageInfo info = pm.getPackageArchiveInfo(apk.getAbsolutePath(),
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
-                        ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES);
+        PackageInfo info = pm.getPackageArchiveInfo(apk.getAbsolutePath(), 0);
         if (info == null) {
-            throw new java.io.IOException("El paquete APK descargado no es válido.");
+            throw new java.io.IOException("El paquete APK descargado no es válido para este dispositivo.");
         }
     }
 
@@ -402,19 +325,61 @@ public class UpdateChecker implements AutoCloseable {
     }
 
     public void launchInstaller(Activity activity, File apk) {
-        if (!apk.isFile()) {
+        if (apk == null || !apk.isFile()) {
             clearPendingInstall();
             return;
         }
+
+        try {
+            apk.setReadable(true, false);
+        } catch (Exception ignored) {}
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && !activity.getPackageManager().canRequestPackageInstalls()) {
+            Toast.makeText(activity, "Permite a FranyuLauncher instalar aplicaciones para continuar.", Toast.LENGTH_LONG).show();
             Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                     Uri.parse("package:" + context.getPackageName()));
             activity.startActivity(settings);
             return;
         }
-        Uri uri = FileProvider.getUriForFile(context,
-                context.getPackageName() + ".updateprovider", apk);
+
+        Uri uri;
+        try {
+            uri = FileProvider.getUriForFile(context,
+                    context.getPackageName() + ".updateprovider", apk);
+        } catch (Exception e) {
+            Log.e(TAG, "FileProvider error, fallback to Uri.fromFile", e);
+            uri = Uri.fromFile(apk);
+        }
+
+        Intent viewIntent = new Intent(Intent.ACTION_VIEW);
+        viewIntent.setDataAndType(uri, "application/vnd.android.package-archive");
+        viewIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        viewIntent.addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        viewIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        viewIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        viewIntent.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
+        viewIntent.setClipData(ClipData.newRawUri("FranyuLauncher APK", uri));
+
+        List<ResolveInfo> resInfoList = activity.getPackageManager().queryIntentActivities(viewIntent, PackageManager.MATCH_DEFAULT_ONLY);
+        if (resInfoList != null) {
+            for (ResolveInfo resolveInfo : resInfoList) {
+                if (resolveInfo.activityInfo != null) {
+                    String packageName = resolveInfo.activityInfo.packageName;
+                    activity.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
+            }
+        }
+
+        try {
+            activity.startActivity(viewIntent);
+            clearPendingInstall();
+            return;
+        } catch (Exception e) {
+            Log.e(TAG, "ACTION_VIEW failed, attempting ACTION_INSTALL_PACKAGE fallback", e);
+        }
+
         Intent installIntent = new Intent(Intent.ACTION_INSTALL_PACKAGE);
         installIntent.setDataAndType(uri, "application/vnd.android.package-archive");
         installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -423,27 +388,54 @@ public class UpdateChecker implements AutoCloseable {
         try {
             activity.startActivity(installIntent);
             clearPendingInstall();
-            return;
-        } catch (ActivityNotFoundException ignored) {
-        } catch (SecurityException e) {
-            Toast.makeText(activity,
-                    "Android bloqueó el instalador. Permite instalar aplicaciones desde FranyuLauncher.",
-                    Toast.LENGTH_LONG).show();
-            return;
+        } catch (Exception e2) {
+            Log.e(TAG, "All installer intents failed", e2);
+            Toast.makeText(activity, "Error al abrir el instalador de APK: " + e2.getMessage(), Toast.LENGTH_LONG).show();
         }
-        Intent viewIntent = new Intent(Intent.ACTION_VIEW);
-        viewIntent.setDataAndType(uri, "application/vnd.android.package-archive");
-        viewIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        viewIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        viewIntent.setClipData(ClipData.newRawUri("FranyuLauncher APK", uri));
-        try {
-            activity.startActivity(viewIntent);
-            clearPendingInstall();
-        } catch (Exception e) {
-            Toast.makeText(activity,
-                    "Android no encontró un instalador de APK disponible.",
-                    Toast.LENGTH_LONG).show();
+    }
+
+    public static boolean isSameOrEquivalentVersion(String remote, String installed) {
+        if (remote == null || installed == null) return false;
+        int[] r = numbers(remote);
+        int[] i = numbers(installed);
+        if (r.length == 0 || i.length == 0) return remote.trim().equalsIgnoreCase(installed.trim());
+        int len = Math.max(r.length, i.length);
+        for (int k = 0; k < len; k++) {
+            int a = k < r.length ? r[k] : 0;
+            int b = k < i.length ? i[k] : 0;
+            if (a != b) return false;
         }
+        return true;
+    }
+
+    public static boolean isNewer(String remote, String installed) {
+        if (remote == null || remote.trim().isEmpty()) return false;
+        if (installed == null || installed.trim().isEmpty() || installed.startsWith("LOCAL-")) return true;
+        int[] r = numbers(remote);
+        int[] i = numbers(installed);
+        int len = Math.max(r.length, i.length);
+        for (int k = 0; k < len; k++) {
+            int a = k < r.length ? r[k] : 0;
+            int b = k < i.length ? i[k] : 0;
+            if (a > b) return true;
+            if (a < b) return false;
+        }
+        return false;
+    }
+
+    private static int[] numbers(String v) {
+        String clean = v.replaceAll("[^0-9.]", " ").trim();
+        if (clean.isEmpty()) return new int[0];
+        String[] parts = clean.split("[. ]+");
+        java.util.List<Integer> list = new java.util.ArrayList<>();
+        for (String p : parts) {
+            try {
+                if (!p.isEmpty()) list.add(Integer.parseInt(p));
+            } catch (NumberFormatException ignored) {}
+        }
+        int[] out = new int[list.size()];
+        for (int k = 0; k < out.length; k++) out[k] = list.get(k);
+        return out;
     }
 
     private void clearPendingInstall() {

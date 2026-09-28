@@ -3,31 +3,34 @@ package net.kdt.pojavlaunch.features;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
-import android.os.Build;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Environment;
+import android.view.Gravity;
+import android.view.View;
+import android.view.animation.DecelerateInterpolator;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import net.kdt.pojavlaunch.PojavApplication;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceManager;
+import net.kdt.pojavlaunch.multirt.RuntimeCatalogManager;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
-import net.kdt.pojavlaunch.utils.MCOptionUtils;
 
 import org.apache.commons.io.IOUtils;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
@@ -36,109 +39,310 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import git.artdeell.mojo.R;
-
 /**
- * FranyuSuiteV15 implements the exact list of chosen features for v1.5:
- *
- * Bloque 1 (Rendimiento, Drivers y Gráficos):
- * 1. Gestor Integrado de Drivers Turnip / Zink / Mesa
- * 3. Optimizador Automático de Java Garbage Collector (GC)
- * 5. Reescalado Espacial FSR (FidelityFX Super Resolution / Resolution Ratio)
- * 6. Precompilación y Pre-caching de Shaders
- * 7. Limpiador Automático de Caché de Texturas y Chunks
- * 10. Acelerador de Arranque por DexCache Compartido
- *
- * Bloque 2 (Instancias, Modpacks y Addons):
- * 1. Instalador de Shaders Móviles con 1 Toque
- * 2. Actualizador de Mods con 1 Toque
- * 3. Exportador y Clonador de Instancias a .ZIP
- * 4. Analizador Preventivo de Incompatibilidad de Mods
- * 5. Importador Directo de Modpacks por URL
- * 6. Interruptor Rápido de Mods (Habilitar / Deshabilitar)
- * 8. Explorador de Archivos Interno Especializado
- *
- * Bloque 5 (Diagnóstico, Red y Multijugador):
- * 7. Soporte de Skins Personalizadas para Cuentas Offline
- * 10. Comprobador de Integridad de Archivos (SHA-1 Check)
+ * FranyuSuiteV15: Suite Oficial de Rendimiento, Herramientas, Shaders, Mods y Runtimes Java
+ * con diseño de consola de juegos de alta fidelidad y micro-animaciones interactivas.
  */
 public final class FranyuSuiteV15 {
 
     private FranyuSuiteV15() {}
 
     /**
-     * Menú principal de la versión 1.5 organizado en los bloques seleccionados.
+     * Muestra el menú principal de Franyu Suite v1.5 con diseño visual de consola y animaciones.
      */
     public static void showSuiteDialog(Context context) {
-        String[] sections = new String[]{
-                "⚡ [Bloque 1] Rendimiento, Drivers y Gráficos (1, 3, 5, 6, 7, 10)",
-                "📦 [Bloque 2] Instancias, Modpacks y Mods (1, 2, 3, 4, 5, 6, 8)",
-                "🛡️ [Bloque 5] Skins Offline e Integridad SHA-1 (7, 10)"
-        };
+        float density = context.getResources().getDisplayMetrics().density;
+        int p20 = Math.round(20 * density);
+        int p16 = Math.round(16 * density);
+        int p12 = Math.round(12 * density);
+        int p8 = Math.round(8 * density);
+        int p6 = Math.round(6 * density);
+        int p4 = Math.round(4 * density);
 
-        new AlertDialog.Builder(context)
-                .setTitle("FranyuLauncher v1.5 - Suite Oficial")
-                .setItems(sections, (dialog, which) -> {
-                    switch (which) {
-                        case 0:
-                            showBlock1PerformanceDialog(context);
-                            break;
-                        case 1:
-                            showBlock2InstancesDialog(context);
-                            break;
-                        case 2:
-                            showBlock5DiagnosticsDialog(context);
-                            break;
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        int cBgRoot = Color.parseColor("#080C14");
+        int cBorder = Color.parseColor("#1E293B");
+        int cEmerald = Color.parseColor("#10B981");
+        int cCyan = Color.parseColor("#38BDF8");
+        int cAmber = Color.parseColor("#F59E0B");
+        int cPurple = Color.parseColor("#A855F7");
+        int cTextLight = Color.parseColor("#F8FAFC");
+        int cTextMuted = Color.parseColor("#94A3B8");
+
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(p16, p16, p16, p16);
+
+        GradientDrawable rootBg = new GradientDrawable();
+        rootBg.setColor(cBgRoot);
+        rootBg.setCornerRadius(22 * density);
+        rootBg.setStroke(Math.round(1.5f * density), Color.parseColor("#059669"));
+        root.setBackground(rootBg);
+
+        // Header Top Row (Badge + Close button)
+        LinearLayout headerRow = new LinearLayout(context);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView badge = new TextView(context);
+        badge.setText(" ⚡ FRANYU SUITE v1.5 • OFICIAL ");
+        badge.setTextSize(10);
+        badge.setTextColor(Color.WHITE);
+        badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        GradientDrawable badgeBg = new GradientDrawable();
+        badgeBg.setColor(Color.parseColor("#059669"));
+        badgeBg.setCornerRadius(8 * density);
+        badge.setBackground(badgeBg);
+        badge.setPadding(p8, p4, p8, p4);
+        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        headerRow.addView(badge, badgeLp);
+
+        TextView closeIcon = new TextView(context);
+        closeIcon.setText("✕");
+        closeIcon.setTextColor(cTextMuted);
+        closeIcon.setTextSize(16);
+        closeIcon.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        closeIcon.setPadding(p8, p4, p8, p4);
+        headerRow.addView(closeIcon);
+        root.addView(headerRow);
+
+        // Main Title
+        TextView title = new TextView(context);
+        title.setText("Centro de Rendimiento y Herramientas");
+        title.setTextSize(18);
+        title.setTextColor(cTextLight);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.topMargin = p8;
+        root.addView(title, titleLp);
+
+        TextView subtitle = new TextView(context);
+        subtitle.setText("Optimiza tus FPS, gestiona drivers, shaders, mods y runtimes en 1 toque.");
+        subtitle.setTextSize(12);
+        subtitle.setTextColor(cTextMuted);
+        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
+        subLp.topMargin = p4;
+        subLp.bottomMargin = p12;
+        root.addView(subtitle, subLp);
+
+        // Telemetry Chips Bar
+        LinearLayout telemetryBar = new LinearLayout(context);
+        telemetryBar.setOrientation(LinearLayout.HORIZONTAL);
+        telemetryBar.setGravity(Gravity.CENTER_VERTICAL);
+
+        long freeRam = Tools.getFreeDeviceMemory(context);
+        String renderer = LauncherPreferences.PREF_RENDERER == null ? "Default" : LauncherPreferences.PREF_RENDERER;
+        int fsrPercent = Math.round(LauncherPreferences.PREF_SCALE_FACTOR * 100);
+
+        addTelemetryChip(context, telemetryBar, "🧠 " + freeRam + " MB RAM", cEmerald, density);
+        addTelemetryChip(context, telemetryBar, "🎮 " + renderer.toUpperCase(Locale.ROOT), cCyan, density);
+        addTelemetryChip(context, telemetryBar, "🔍 FSR: " + fsrPercent + "%", cAmber, density);
+
+        LinearLayout.LayoutParams telemLp = new LinearLayout.LayoutParams(-1, -2);
+        telemLp.bottomMargin = p12;
+        root.addView(telemetryBar, telemLp);
+
+        // Scrollable Options Content
+        ScrollView scroll = new ScrollView(context);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        AlertDialog[] dialogHolder = new AlertDialog[1];
+        closeIcon.setOnClickListener(v -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+        });
+
+        // 1. RENDIMIENTO Y GRÁFICOS (Emerald)
+        addCategoryHeader(context, content, "⚡ RENDIMIENTO, DRIVERS Y GRÁFICOS", cEmerald, density);
+        addOptionCard(context, content, "🎮 Gestor de Drivers Turnip / Zink / Mesa", "Mesa Turnip v24.2, Zink Vulkan, ANGLE y VirGL con selector en caliente.", cEmerald, density, () -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+            showDriversManager(context);
+        });
+        addOptionCard(context, content, "🧠 Optimizador Automático de Garbage Collector (GC)", "Aplica Shenandoah Generacional, G1GC o SerialGC según la memoria de tu equipo.", cEmerald, density, () -> {
+            applyAutoGcOptimizer(context);
+        });
+        addOptionCard(context, content, "🔍 Reescalado Espacial FSR (Multiplicador de FPS)", "Reduce resolución de renderizado con preservación de nitidez (50% a 100%).", cEmerald, density, () -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+            showFsrResolutionDialog(context);
+        });
+        addOptionCard(context, content, "✨ Precompilación y Pre-caching de Shaders", "Elimina tirones y congelamientos al explorar mundos mediante precarga GLSL.", cEmerald, density, () -> {
+            enableShaderPrecache(context);
+        });
+        addOptionCard(context, content, "🧹 Limpiador de Caché de Texturas y Chunks", "Libera memoria y espacio de almacenamiento de forma 100% segura.", cEmerald, density, () -> {
+            cleanTextureAndChunkCache(context);
+        });
+        addOptionCard(context, content, "⏩ Acelerador DexCache Compartido", "Acelera el arranque en frío del launcher y componentes del juego.", cEmerald, density, () -> {
+            accelerateDexStartup(context);
+        });
+
+        // 2. RUNTIMES JAVA OFICIALES (Cyan)
+        addCategoryHeader(context, content, "☕ RUNTIMES JAVA OFICIALES", cCyan, density);
+        addOptionCard(context, content, "☕ Catálogo Oficial de Runtimes Java (8, 17, 21, 25)", "Descarga e instala entornos Java oficiales y verificados para cualquier versión de Minecraft.", cCyan, density, () -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+            RuntimeCatalogManager.showCatalogDialog(context, null);
+        });
+
+        // 3. INSTANCIAS, MODPACKS Y SHADERS (Amber)
+        addCategoryHeader(context, content, "📦 INSTANCIAS, MODPACKS Y MODS", cAmber, density);
+        addOptionCard(context, content, "🎨 Instalador de Shaders Móviles (1 Toque)", "MakeUp UltraFast, BSL Mobile, Complementary Reimagined y Sildurs.", cAmber, density, () -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+            showShaderInstaller(context);
+        });
+        addOptionCard(context, content, "🔄 Actualizador de Mods (1 Toque)", "Escanea e inspecciona mods compatibles en tu instancia actual.", cAmber, density, () -> {
+            checkModsUpdates(context);
+        });
+        addOptionCard(context, content, "💾 Exportador y Backup de Instancia a .ZIP", "Genera una copia de seguridad completa en Downloads/FranyuLauncher_Backups.", cAmber, density, () -> {
+            exportInstanceZip(context);
+        });
+        addOptionCard(context, content, "🛡️ Analizador Preventivo de Conflictos de Mods", "Detecta versiones duplicadas e incompatibilidades antes de abrir el juego.", cAmber, density, () -> {
+            analyzeModsCompatibility(context);
+        });
+        addOptionCard(context, content, "🌐 Importador Directo de Modpacks por URL", "Pega el enlace directo de un .mrpack o .zip para instalarlo.", cAmber, density, () -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+            importModpackFromUrl(context);
+        });
+        addOptionCard(context, content, "🎛️ Interruptor Rápido de Mods (Habilitar / Deshabilitar)", "Activa o apaga mods individualmente (.jar <-> .disabled) al instante.", cAmber, density, () -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+            toggleModsList(context);
+        });
+        addOptionCard(context, content, "📂 Explorador Interno de Carpetas de Minecraft", "Acceso directo con 1 toque a saves/, mods/, shaderpacks/ y screenshots/.", cAmber, density, () -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+            openInternalFileExplorer(context);
+        });
+
+        // 4. SKINS Y SEGURIDAD (Purple)
+        addCategoryHeader(context, content, "🛡️ SKINS OFFLINE Y SEGURIDAD", cPurple, density);
+        addOptionCard(context, content, "👤 Soporte de Skins para Cuentas Offline", "Configura skins personalizadas en formato PNG para jugar sin conexión.", cPurple, density, () -> {
+            setupOfflineSkin(context);
+        });
+        addOptionCard(context, content, "🔒 Comprobador Criptográfico de Integridad SHA-1", "Comprueba que todos los JARs y binarios estén intactos y sin corrupción.", cPurple, density, () -> {
+            checkGameFilesIntegrity(context);
+        });
+
+        scroll.addView(content);
+        LinearLayout.LayoutParams scLp = new LinearLayout.LayoutParams(-1, Math.round(380 * density));
+        root.addView(scroll, scLp);
+
+        AlertDialog dialog = new AlertDialog.Builder(context)
+                .setView(root)
+                .setCancelable(true)
+                .create();
+
+        dialogHolder[0] = dialog;
+
+        // Micro-animación de entrada al mostrar el diálogo
+        dialog.setOnShowListener(d -> {
+            root.setAlpha(0f);
+            root.setScaleX(0.92f);
+            root.setScaleY(0.92f);
+            root.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(220)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start();
+        });
+
+        dialog.show();
+    }
+
+    private static void addTelemetryChip(Context context, LinearLayout parent, String text, int color, float density) {
+        TextView chip = new TextView(context);
+        chip.setText(text);
+        chip.setTextSize(11);
+        chip.setTextColor(color);
+        chip.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#0F172A"));
+        bg.setCornerRadius(10 * density);
+        bg.setStroke(Math.round(1f * density), color);
+        chip.setBackground(bg);
+        chip.setPadding(Math.round(8 * density), Math.round(4 * density), Math.round(8 * density), Math.round(4 * density));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.rightMargin = Math.round(6 * density);
+        parent.addView(chip, lp);
+    }
+
+    private static void addCategoryHeader(Context context, LinearLayout parent, String title, int accentColor, float density) {
+        TextView header = new TextView(context);
+        header.setText(title);
+        header.setTextSize(11);
+        header.setTextColor(accentColor);
+        header.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        header.setLetterSpacing(0.06f);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.topMargin = Math.round(14 * density);
+        lp.bottomMargin = Math.round(6 * density);
+        parent.addView(header, lp);
+    }
+
+    private static void addOptionCard(Context context, LinearLayout parent, String titleText, String descText, int accentColor, float density, Runnable action) {
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        int p10 = Math.round(10 * density);
+        int p4 = Math.round(4 * density);
+        card.setPadding(p10, p10, p10, p10);
+
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(Color.parseColor("#0F172A"));
+        cardBg.setCornerRadius(12 * density);
+        cardBg.setStroke(Math.round(1f * density), Color.parseColor("#1E293B"));
+        card.setBackground(cardBg);
+
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+        cardLp.bottomMargin = Math.round(6 * density);
+        card.setLayoutParams(cardLp);
+
+        // Title Row
+        LinearLayout titleRow = new LinearLayout(context);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView title = new TextView(context);
+        title.setText(titleText);
+        title.setTextSize(13);
+        title.setTextColor(Color.parseColor("#F8FAFC"));
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        titleRow.addView(title, tLp);
+
+        TextView arrow = new TextView(context);
+        arrow.setText("›");
+        arrow.setTextColor(accentColor);
+        arrow.setTextSize(18);
+        arrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        titleRow.addView(arrow);
+        card.addView(titleRow);
+
+        TextView desc = new TextView(context);
+        desc.setText(descText);
+        desc.setTextSize(11);
+        desc.setTextColor(Color.parseColor("#94A3B8"));
+        desc.setLineSpacing(0, 1.15f);
+        LinearLayout.LayoutParams dLp = new LinearLayout.LayoutParams(-1, -2);
+        dLp.topMargin = p4;
+        card.addView(desc, dLp);
+
+        card.setOnClickListener(v -> {
+            v.animate().scaleX(0.97f).scaleY(0.97f).setDuration(80).withEndAction(() -> {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(80).withEndAction(() -> {
+                    if (action != null) action.run();
+                }).start();
+            }).start();
+        });
+
+        parent.addView(card);
     }
 
     // =========================================================================
-    // BLOQUE 1: RENDIMIENTO, DRIVERS Y GRÁFICOS (1, 3, 5, 6, 7, 10)
+    // IMPLEMENTACIONES FUNCIONALES DE CADA MÓDULO
     // =========================================================================
-
-    public static void showBlock1PerformanceDialog(Context context) {
-        String[] options = new String[]{
-                "1. Gestor de Drivers Turnip / Zink / Mesa",
-                "3. Optimizador Automático de Garbage Collector (GC)",
-                "5. Reescalado Espacial FSR (Ajuste de Resolución)",
-                "6. Precompilación y Pre-caching de Shaders",
-                "7. Limpiador Automático de Caché y Chunks",
-                "10. Acelerador de Arranque (DexCache Compartido)"
-        };
-
-        new AlertDialog.Builder(context)
-                .setTitle("Bloque 1: Rendimiento y Gráficos")
-                .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // 1. Drivers Turnip/Zink
-                            showDriversManager(context);
-                            break;
-                        case 1: // 3. Auto GC Optimizer
-                            applyAutoGcOptimizer(context);
-                            break;
-                        case 2: // 5. FSR / Scaler
-                            showFsrResolutionDialog(context);
-                            break;
-                        case 3: // 6. Precompilación de Shaders
-                            enableShaderPrecache(context);
-                            break;
-                        case 4: // 7. Limpiador de Caché
-                            cleanTextureAndChunkCache(context);
-                            break;
-                        case 5: // 10. Acelerador DexCache
-                            accelerateDexStartup(context);
-                            break;
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
 
     /** 1.1 Gestor de Drivers Turnip / Zink */
     private static void showDriversManager(Context context) {
@@ -200,7 +404,7 @@ public final class FranyuSuiteV15 {
         }
     }
 
-    /** 1.5 Reescalado Espacial FSR (FidelityFX Super Resolution / Scaler) */
+    /** 1.5 Reescalado Espacial FSR (Ajuste de Resolución) */
     private static void showFsrResolutionDialog(Context context) {
         String[] scaleOptions = new String[]{
                 "FSR Rendimiento Ultra: 50% (Doble de FPS - Gama Baja)",
@@ -301,53 +505,6 @@ public final class FranyuSuiteV15 {
 
         System.setProperty("dexmaker.dexcache", dexCache.getAbsolutePath());
         Toast.makeText(context, "Acelerador DexCache activado. Arranque rápido habilitado.", Toast.LENGTH_LONG).show();
-    }
-
-
-    // =========================================================================
-    // BLOQUE 2: INSTANCIAS, MODPACKS Y MODS (1, 2, 3, 4, 5, 6, 8)
-    // =========================================================================
-
-    public static void showBlock2InstancesDialog(Context context) {
-        String[] options = new String[]{
-                "1. Instalador de Shaders Móviles (1 Toque)",
-                "2. Actualizador de Mods (1 Toque)",
-                "3. Exportador y Clonador de Instancias (.zip)",
-                "4. Analizador Preventivo de Incompatibilidad de Mods",
-                "5. Importador Directo de Modpacks por URL",
-                "6. Interruptor de Mods (Habilitar / Deshabilitar)",
-                "8. Explorador de Archivos Interno Especializado"
-        };
-
-        new AlertDialog.Builder(context)
-                .setTitle("Bloque 2: Instancias y Mods")
-                .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // 1. Instalador Shaders
-                            showShaderInstaller(context);
-                            break;
-                        case 1: // 2. Actualizador Mods
-                            checkModsUpdates(context);
-                            break;
-                        case 2: // 3. Exportador .zip
-                            exportInstanceZip(context);
-                            break;
-                        case 3: // 4. Analizador preventivo
-                            analyzeModsCompatibility(context);
-                            break;
-                        case 4: // 5. Importador URL
-                            importModpackFromUrl(context);
-                            break;
-                        case 5: // 6. Interruptor Mods
-                            toggleModsList(context);
-                            break;
-                        case 6: // 8. Explorador interno
-                            openInternalFileExplorer(context);
-                            break;
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
     }
 
     /** 2.1 Instalador de Shaders Móviles con 1 Toque */
@@ -473,7 +630,6 @@ public final class FranyuSuiteV15 {
 
         File[] files = modsDir.listFiles((d, n) -> n.endsWith(".jar") || n.endsWith(".jar.disabled"));
         List<String> duplicated = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
 
         if (files != null) {
             for (int i = 0; i < files.length; i++) {
@@ -599,33 +755,6 @@ public final class FranyuSuiteV15 {
                     File dir = targetDirs[which];
                     if (!dir.exists()) dir.mkdirs();
                     Tools.openPath(context, dir, false);
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
-
-    // =========================================================================
-    // BLOQUE 5: DIAGNÓSTICO, RED Y MULTIJUGADOR (7, 10)
-    // =========================================================================
-
-    public static void showBlock5DiagnosticsDialog(Context context) {
-        String[] options = new String[]{
-                "7. Soporte de Skins Personalizadas para Cuentas Offline",
-                "10. Comprobador de Integridad de Archivos (SHA-1 Check)"
-        };
-
-        new AlertDialog.Builder(context)
-                .setTitle("Bloque 5: Skins e Integridad")
-                .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // 7. Skins Offline
-                            setupOfflineSkin(context);
-                            break;
-                        case 1: // 10. SHA-1 Integrity Check
-                            checkGameFilesIntegrity(context);
-                            break;
-                    }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
