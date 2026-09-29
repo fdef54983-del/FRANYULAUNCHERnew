@@ -153,6 +153,23 @@ public class JavaRunner {
 
             Log.i(TAG, "Using verified caciocavallo17 agent: " + agentJar.getAbsolutePath());
             javaArgList.add("-javaagent:" + agentJar.getAbsolutePath());
+
+            // Append the agent JAR and any companion jars (e.g. cacio-shared if present) to the bootclasspath
+            // This is required for the Bootstrap ClassLoader in Java 17+ to resolve the agent classes during startup
+            StringBuilder bootClasspath = new StringBuilder("-Xbootclasspath/a:").append(agentJar.getAbsolutePath());
+            File[] siblingJars = caciocavallo17AgentDir.listFiles();
+            if (siblingJars != null) {
+                for (File sibling : siblingJars) {
+                    if (sibling.isFile()
+                            && sibling.getName().endsWith(".jar")
+                            && !sibling.getAbsolutePath().equals(agentJar.getAbsolutePath())
+                            && isValidJarContaining(sibling, null)) {
+                        bootClasspath.append(':').append(sibling.getAbsolutePath());
+                    }
+                }
+            }
+            javaArgList.add(bootClasspath.toString());
+
             javaArgList.add("-Dawt.toolkit=com.github.caciocavallosilano.cacio.ctc.CTCToolkit");
             javaArgList.add("-Djava.awt.graphicsenv=com.github.caciocavallosilano.cacio.ctc.CTCGraphicsEnvironment");
 
