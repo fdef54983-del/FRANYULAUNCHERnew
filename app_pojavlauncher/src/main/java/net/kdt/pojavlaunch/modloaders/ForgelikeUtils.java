@@ -12,6 +12,7 @@ import org.xml.sax.SAXException;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -31,34 +32,30 @@ public abstract class ForgelikeUtils {
     private final boolean mVersionOrderInversed;
 
     private ForgelikeUtils(String name, String cachePrefix, String iconName, String versionResolver, String metadataUrl, String installerUrl, boolean versionOrderInversed) {
-        this.mName = name;
-        this.mCachePrefix = cachePrefix;
-        this.mIconName = iconName;
-        this.mVersionResolver = versionResolver;
-        this.mMetadataUrl = metadataUrl;
-        this.mInstallerUrl = installerUrl;
-        this.mVersionOrderInversed = versionOrderInversed;
+        mName = name;
+        mCachePrefix = cachePrefix;
+        mVersionResolver = versionResolver;
+        mIconName = iconName;
+        mMetadataUrl = metadataUrl;
+        mInstallerUrl = installerUrl;
+        mVersionOrderInversed = versionOrderInversed;
     }
 
     public List<String> downloadVersions() throws IOException {
-        SAXParser saxParser;
+        SAXParser parser;
         try {
-            SAXParserFactory parserFactory = SAXParserFactory.newInstance();
-            saxParser = parserFactory.newSAXParser();
+            SAXParserFactory spf = SAXParserFactory.newInstance();
+            parser = spf.newSAXParser();
         } catch (SAXException | ParserConfigurationException e) {
             e.printStackTrace();
-            // if we cant make a parser we might as well not even try to parse anything
             return null;
         }
         try {
-            //of_test();
-            return DownloadUtils.downloadStringCached(mMetadataUrl, mCachePrefix + "_versions", input -> {
+            return DownloadUtils.downloadStringCached(mMetadataUrl, mCachePrefix + "_versions", (str) -> {
                 try {
                     ForgelikeVersionListHandler handler = new ForgelikeVersionListHandler();
-                    saxParser.parse(new InputSource(new StringReader(input)), handler);
+                    parser.parse(new InputSource(new StringReader(str)), handler);
                     return handler.getVersions();
-                    // IOException is present here StringReader throws it only if the parser called close()
-                    // sooner than needed, which is a parser issue and not an I/O one
                 } catch (SAXException | IOException e) {
                     throw new DownloadUtils.ParseException(e);
                 }
@@ -73,13 +70,14 @@ public abstract class ForgelikeUtils {
         return String.format(mInstallerUrl, version);
     }
 
-    public InstanceInstaller createInstaller(String gameVersion, String modLoaderVersion) throws IOException {
+    public InstanceInstaller createInstaller(String minecraftVersion, String modLoaderVersion) throws IOException {
         List<String> versions = downloadVersions();
         if (versions == null) return null;
-        String versionStart = String.format(mVersionResolver, gameVersion, modLoaderVersion);
-        for (String versionName : versions) {
-            if (!versionName.startsWith(versionStart)) continue;
-            return createInstaller(versionName);
+        String prefix = String.format(mVersionResolver, minecraftVersion, modLoaderVersion);
+        for (String version : versions) {
+            if (version.startsWith(prefix)) {
+                return createInstaller(version);
+            }
         }
         return null;
     }
@@ -89,7 +87,7 @@ public abstract class ForgelikeUtils {
         String hash = DownloadUtils.downloadString(downloadUrl + ".sha1");
         File installerLocation = new File(Tools.DIR_CACHE, mCachePrefix + "-installer-" + fullVersion + ".jar");
         InstanceInstaller instanceInstaller = new InstanceInstaller();
-        instanceInstaller.commandLineArgs = List.of("-Duser.language=en", "-Duser.country=US", "-javaagent:"+Tools.DIR_DATA+"/forge_installer/forge_installer.jar");
+        instanceInstaller.commandLineArgs = Arrays.asList("-Duser.language=en", "-Duser.country=US", "-javaagent:"+Tools.DIR_DATA+"/forge_installer/forge_installer.jar");
         instanceInstaller.installerJar = installerLocation.getAbsolutePath();
         instanceInstaller.installerSha1 = hash;
         instanceInstaller.installerDownloadUrl = downloadUrl;
@@ -113,11 +111,6 @@ public abstract class ForgelikeUtils {
     }
 
     private static String getMcVersionForNeoVersion(String neoVersion) {
-        // I feel like it's necessary to explain the NeoForge versioning format
-        // basically, what it does is it trims the major version from minecrafts version
-        // e.g.: 1.20.1 -> 20.1, and then appends its own "patch" version to that
-        // e.g.: 20.1 -> 20.1.8, which means the version string includes both, the minecraft
-        // and the loader version at once
         try {
             int firstIndex = neoVersion.indexOf('.');
             int secondIndex = neoVersion.indexOf('.', firstIndex + 1);

@@ -6,6 +6,7 @@ import net.kdt.pojavlaunch.utils.DownloadUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -28,7 +29,7 @@ public class OptiFineUtils {
         instanceInstaller.installerUrlTransformer = "optifine";
         instanceInstaller.installerDownloadUrl = version.downloadUrl;
         instanceInstaller.installerJar = installerLocation.getAbsolutePath();
-        instanceInstaller.commandLineArgs = List.of("-javaagent:"+ Tools.DIR_DATA+"/forge_installer/forge_installer.jar=OF");
+        instanceInstaller.commandLineArgs = Collections.singletonList("-javaagent:"+ Tools.DIR_DATA+"/forge_installer/forge_installer.jar=OF");
         return instanceInstaller;
     }
 

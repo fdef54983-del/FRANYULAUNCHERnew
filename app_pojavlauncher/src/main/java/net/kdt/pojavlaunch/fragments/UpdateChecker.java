@@ -24,11 +24,13 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -122,7 +124,13 @@ public class UpdateChecker implements AutoCloseable {
 
                 String json;
                 try (InputStream in = c.getInputStream()) {
-                    json = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    byte[] data = new byte[4096];
+                    int nRead;
+                    while ((nRead = in.read(data, 0, data.length)) != -1) {
+                        buffer.write(data, 0, nRead);
+                    }
+                    json = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
                 } finally {
                     c.disconnect();
                 }
