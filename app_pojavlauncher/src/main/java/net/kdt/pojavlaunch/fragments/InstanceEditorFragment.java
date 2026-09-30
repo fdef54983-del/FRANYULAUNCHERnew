@@ -162,10 +162,16 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
         if(jvmIndex == -1) jvmIndex = runtimes.size() - 1;
         mDefaultRuntime.setSelection(jvmIndex);
 
-        // Renderer spinner
-        int rendererIndex = mRenderNames.indexOf(instance.getLaunchRenderer());
-        if(rendererIndex == -1) {
-            rendererIndex = mDefaultRenderer.getAdapter().getCount() - 1;
+        // Renderer spinner: if instance.renderer is null, select the Global Default option (last item)
+        // Never resolve against LauncherPreferences here, otherwise saving re-writes the default as a fixed renderer!
+        int rendererIndex;
+        if(instance.renderer == null) {
+            rendererIndex = mRenderNames.size();
+        } else {
+            rendererIndex = mRenderNames.indexOf(instance.renderer);
+            if(rendererIndex == -1) {
+                rendererIndex = mRenderNames.size();
+            }
         }
         mDefaultRenderer.setSelection(rendererIndex);
 
@@ -194,9 +200,6 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     }
 
     private void save(){
-        //First, check for potential issues in the inputs
-        mInstance.versionId = mDefaultVersion.getText().toString();
-        mInstance.controlLayout = mDefaultControl.getText().toString();
         mInstance.name = mDefaultName.getText().toString();
         mInstance.jvmArgs = mDefaultJvmArgument.getText().toString();
 

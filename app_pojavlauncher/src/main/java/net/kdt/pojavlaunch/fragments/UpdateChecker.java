@@ -238,7 +238,18 @@ public class UpdateChecker implements AutoCloseable {
         if (update == null || activity == null || closed) return;
         executor.execute(() -> {
             String safeVersion = update.version.replaceAll("[^a-zA-Z0-9._-]", "_");
-            File apk = new File(context.getCacheDir(), "franyulauncher-" + safeVersion + ".apk");
+            File cacheDir = context.getCacheDir();
+            if (cacheDir != null) {
+                File[] oldApks = cacheDir.listFiles((d, name) -> name.startsWith("franyulauncher-") && name.endsWith(".apk"));
+                if (oldApks != null) {
+                    for (File old : oldApks) {
+                        if (!old.getName().equals("franyulauncher-" + safeVersion + ".apk")) {
+                            old.delete();
+                        }
+                    }
+                }
+            }
+            File apk = new File(cacheDir != null ? cacheDir : context.getFilesDir(), "franyulauncher-" + safeVersion + ".apk");
             try {
                 downloadWithProgress(update.apkUrl, apk, update.size, progressCallback);
                 validateApk(apk);

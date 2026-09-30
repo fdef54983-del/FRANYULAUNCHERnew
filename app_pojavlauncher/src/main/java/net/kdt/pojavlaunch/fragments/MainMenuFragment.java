@@ -41,6 +41,7 @@ import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceIconProvider;
 import net.kdt.pojavlaunch.instances.InstanceManager;
+import net.kdt.pojavlaunch.UpdateStartupGate;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.utils.FileUtils;
 
@@ -310,7 +311,7 @@ public class MainMenuFragment extends Fragment {
 
         ScrollView scroll = new ScrollView(ctx);
         TextView notes = new TextView(ctx);
-        notes.setText(update.body == null || update.body.trim().isEmpty() ? "Mejoras de rendimiento y estabilidad." : update.body.trim());
+        notes.setText(UpdateStartupGate.cleanReleaseNotes(update.body));
         notes.setTextSize(13);
         notes.setTextColor(text);
         notes.setLineSpacing(0, 1.15f);

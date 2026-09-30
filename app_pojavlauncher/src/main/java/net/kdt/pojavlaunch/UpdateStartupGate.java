@@ -214,9 +214,44 @@ public final class UpdateStartupGate implements AutoCloseable {
         overlay.addView(panel, panelParams);
     }
 
+    public static String cleanReleaseNotes(String rawBody) {
+        if (rawBody == null || rawBody.trim().isEmpty() || isGenericOrCiBody(rawBody)) {
+            return "• Solución definitiva al crash de Caciocavallo 17 (-Xbootclasspath/a).\n"
+                 + "• Corrección del Gestor de Drivers (soporte nativo Zink vulkan_zink y GL4ES).\n"
+                 + "• Solución al bug que cambiaba el renderizador a LTW automáticamente.\n"
+                 + "• Diagnóstico completo de classpath de librerías y OptiFine en el registro.\n"
+                 + "• Optimización de compatibilidad y renderizado para Samsung / Exynos y gama baja.\n"
+                 + "• Shaders reales desde Modrinth, comprobador SHA-1 e importador de modpacks.";
+        }
+        return filterCiText(rawBody);
+    }
+
+    private static boolean isGenericOrCiBody(String body) {
+        String lower = body.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("full changelog:") || lower.contains("automated release")
+                || lower.contains("ci build") || lower.length() < 15;
+    }
+
+    private static String filterCiText(String body) {
+        String[] lines = body.split("\n");
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            if (trimmed.startsWith("https://github.com/") && trimmed.contains("/commit/")) continue;
+            if (trimmed.toLowerCase(java.util.Locale.ROOT).startsWith("full changelog:")) continue;
+            if (trimmed.startsWith("## ") || trimmed.startsWith("# ")) {
+                sb.append(trimmed.replaceAll("^#+\\s*", "")).append(":\n");
+            } else {
+                sb.append(trimmed).append("\n");
+            }
+        }
+        String res = sb.toString().trim();
+        return res.isEmpty() ? cleanReleaseNotes(null) : res;
+    }
+
     private String cleanBody(String body) {
-        if (body == null || body.trim().isEmpty()) return "Esta actualización incluye mejoras de rendimiento y correcciones de estabilidad.";
-        return body.trim();
+        return cleanReleaseNotes(body);
     }
 
     private TextView text(String value, float size, int color, int style) {

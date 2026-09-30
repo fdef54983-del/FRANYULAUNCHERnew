@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import net.kdt.pojavlaunch.Architecture;
 import net.kdt.pojavlaunch.JMinecraftVersionList;
+import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.authenticator.accounts.MinecraftAccount;
 import net.kdt.pojavlaunch.instances.Instance;
@@ -35,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import git.artdeell.mojo.R;
@@ -140,16 +142,24 @@ public class GameRunner {
 
         // Switch renderer to GL4ES when running a compat context version on LTW
         if(isCompatContext(versionInfo) && rendererName.equals("opengles3_ltw")) {
-            instance.renderer = rendererName = "opengles2";
-            instance.write();
+            rendererName = "opengles2";
+            // Only persist to disk if the instance had an explicit non-null override
+            if(instance.renderer != null) {
+                instance.renderer = "opengles2";
+                instance.write();
+            }
         }
 
-        // Switch renderer to LTW when running 1.21.5
+        // Switch renderer to LTW when running 1.21.5+
         boolean ltwSupported = RendererCompatUtil.getCompatibleRenderers(activity).rendererIds.contains("opengles3_ltw");
         if(!isGl4esCompatible(versionInfo) && rendererName.equals("opengles2")) {
             if(ltwSupported) {
-                instance.renderer = rendererName = "opengles3_ltw";
-                instance.write();
+                rendererName = "opengles3_ltw";
+                // Only persist to disk if the instance had an explicit non-null override
+                if(instance.renderer != null) {
+                    instance.renderer = "opengles3_ltw";
+                    instance.write();
+                }
             }else {
                 showDialog(activity, R.string.compat_version_not_supported);
                 System.exit(0);
@@ -237,6 +247,18 @@ public class GameRunner {
 
         activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg,LauncherPreferences.PREF_RAM_ALLOCATION), Toast.LENGTH_SHORT).show());
 
+        // Comprehensive Classpath Logging into the exportable Pojav log
+        Logger.appendToLog("================ JVM LAUNCH CLASSPATH AUDIT (" + launchClassPath.size() + " entries) ================");
+        boolean foundLaunchwrapper = false;
+        for (int i = 0; i < launchClassPath.size(); i++) {
+            String cpEntry = launchClassPath.get(i);
+            boolean isLw = cpEntry.contains("launchwrapper");
+            if (isLw) foundLaunchwrapper = true;
+            Logger.appendToLog(String.format(Locale.ROOT, "  [%03d] %s%s", i, (isLw ? "★ [LAUNCHWRAPPER] " : ""), cpEntry));
+        }
+        Logger.appendToLog("==================================================================================");
+        Logger.appendToLog("[Launchwrapper Status] Present in JVM classpath: " + (foundLaunchwrapper ? "YES" : "NO - MISSING!"));
+
         try {
             JavaRunner.nativeSetupExit(activity);
             JavaRunner.startJvm(runtime, javaArgList, launchClassPath, versionInfo.mainClass, launchArgs);
@@ -323,7 +345,6 @@ public class GameRunner {
             Log.e("CheckForProfileKey", "Failed to determine profile creation date, using \"mojang\"", e);
         }
 
-
         Map<String, String> varArgMap = new ArrayMap<>();
         varArgMap.put("auth_session", profile.accessToken); // For legacy versions of MC
         varArgMap.put("auth_access_token", profile.accessToken);
@@ -381,6 +402,7 @@ public class GameRunner {
         for(String s : libClasspath) {
             if(!FileUtils.exists(s)) {
                 Log.d(Tools.APP_NAME, "Ignored non-exists file: " + s);
+                Logger.appendToLog("[Classpath Warning] Ignored non-existent library file: " + s);
                 continue;
             }
             classpath.add(s);
@@ -404,9 +426,22 @@ public class GameRunner {
 
     public static String[] generateLibClasspath(JMinecraftVersionList.Version info) {
         List<String> libDir = new ArrayList<>();
-        for (DependentLibrary libItem: info.libraries) {
-            if(!checkRules(libItem.rules)) continue;
-            libDir.add(Tools.DIR_HOME_LIBRARY + "/" + Tools.artifactToPath(libItem));
+        Logger.appendToLog("[Classpath Libs] Evaluating libraries for version: " + (info != null ? info.id : "null"));
+        if (info != null && info.libraries != null) {
+            for (DependentLibrary libItem: info.libraries) {
+                if(!checkRules(libItem.rules)) {
+                    Logger.appendToLog("[Classpath Libs] Disallowed by rules: " + libItem.name);
+                    continue;
+                }
+                String artifactPath = Tools.artifactToPath(libItem);
+                String fullPath = Tools.DIR_HOME_LIBRARY + "/" + artifactPath;
+                boolean exists = FileUtils.exists(fullPath);
+                if (libItem.name != null && libItem.name.contains("launchwrapper")) {
+                    Logger.appendToLog("[OptiFine Debug] Found library entry: " + libItem.name
+                            + " -> path: " + fullPath + " [File.exists=" + exists + "]");
+                }
+                libDir.add(fullPath);
+            }
         }
         return libDir.toArray(new String[0]);
     }
