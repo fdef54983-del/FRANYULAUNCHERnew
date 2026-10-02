@@ -61,6 +61,12 @@ public class Instance {
      * @throws IOException in case of write errors
      */
     public void write() throws IOException {
+        if(mInstanceRoot == null) {
+            throw new IOException("Cannot write instance: root directory is null");
+        }
+        if(!mInstanceRoot.exists() && !mInstanceRoot.mkdirs()) {
+            throw new IOException("Failed to create instance directory: " + mInstanceRoot.getAbsolutePath());
+        }
         JSONUtils.writeToFile(InstanceManager.metadataLocation(mInstanceRoot), this);
     }
 

@@ -19,7 +19,11 @@ import net.kdt.pojavlaunch.tasks.AsyncAssetManager;
 import net.kdt.pojavlaunch.utils.JREUtils;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -413,9 +417,15 @@ public class JavaRunner {
 
     /**
      * Start the Java(tm) Virtual Machine with Context awareness for asset auto-recovery.
+     * @param context the Android context
+     * @param runtime the Runtime that we're starting.
+     * @param vmArgs the command line parameters for the virtual machine
+     * @param classpathEntries the absolute path for each classpath entry
+     * @param mainClass the application main class
+     * @param applicationArgs the application arguments
+     * @throws VMLoadException if an error occurred during VM loading
      */
     public static void startJvm(Context context, Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs) throws VMLoadException{
-        // Ensure background component extraction (caciocavallo, lwjgl3, etc.) has finished before starting JVM
         Future<?> componentsFuture = AsyncAssetManager.getComponentsUnpackFuture();
         if (componentsFuture != null) {
             try {
@@ -450,6 +460,8 @@ public class JavaRunner {
         runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs));
 
         runtimeArgs.add("-XX:ActiveProcessorCount=" + java.lang.Runtime.getRuntime().availableProcessors());
+
+        // Construct standard classpath argument
         StringBuilder classpathBuilder = new StringBuilder().append("-Djava.class.path=");
         boolean first = true;
         for(String entry : classpathEntries) {
@@ -457,7 +469,26 @@ public class JavaRunner {
             else classpathBuilder.append(':');
             classpathBuilder.append(entry);
         }
-        runtimeArgs.add(classpathBuilder.toString());
+        String classpathArg = classpathBuilder.toString();
+
+        // Write classpath to persistent temporary argfile (Tools.DIR_CACHE/jvmargs.txt)
+        // This prevents command-line and logging buffer truncation on instances with dozens of libraries
+        File cacheDir = Tools.DIR_CACHE;
+        if(!cacheDir.exists()) cacheDir.mkdirs();
+        File argFile = new File(cacheDir, "jvmargs.txt");
+        try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(argFile, false), StandardCharsets.UTF_8))) {
+            if(classpathArg.contains(" ")) {
+                writer.println("\"" + classpathArg + "\"");
+            } else {
+                writer.println(classpathArg);
+            }
+            writer.flush();
+            runtimeArgs.add("@" + argFile.getAbsolutePath());
+            Log.i(TAG, "Successfully written classpath argfile: " + argFile.getAbsolutePath() + " (" + classpathEntries.size() + " entries)");
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to write jvmargs.txt argfile, falling back to direct argument", e);
+            runtimeArgs.add(classpathArg);
+        }
 
         JREUtils.initializeHooks();
 

@@ -385,8 +385,18 @@ public class GameRunner {
         return strList;
     }
 
-    private static String getClientClasspath(String version) {
-        return Tools.DIR_HOME_VERSION + "/" + version + "/" + version + ".jar";
+    private static String getClientClasspath(JMinecraftVersionList.Version info, String version) {
+        String directPath = Tools.DIR_HOME_VERSION + "/" + version + "/" + version + ".jar";
+        if (FileUtils.exists(directPath)) {
+            return directPath;
+        }
+        if (info != null && info.inheritsFrom != null) {
+            String inheritedPath = Tools.DIR_HOME_VERSION + "/" + info.inheritsFrom + "/" + info.inheritsFrom + ".jar";
+            if (FileUtils.exists(inheritedPath)) {
+                return inheritedPath;
+            }
+        }
+        return directPath;
     }
 
     private static List<String> generateLaunchClassPath(JMinecraftVersionList.Version info, String actualname) {
@@ -407,7 +417,7 @@ public class GameRunner {
             }
             classpath.add(s);
         }
-        classpath.add(getClientClasspath(actualname));
+        classpath.add(getClientClasspath(info, actualname));
         // LWJGLX (custom LWJGL2) comes last - mods must be able to override it
         classpath.add(lwjglxJar.getAbsolutePath());
         classpath.trimToSize();

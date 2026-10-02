@@ -14,10 +14,12 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import git.artdeell.mojo.R;
@@ -83,9 +85,19 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
 
         // Set up behaviors
         mSaveButton.setOnClickListener(v -> {
-            InstanceIconProvider.dropIcon(mInstance);
-            save();
-            Tools.backToMainMenu(requireActivity());
+            try {
+                InstanceIconProvider.dropIcon(mInstance);
+                save();
+                Toast.makeText(requireContext(), R.string.global_save, Toast.LENGTH_SHORT).show();
+                Tools.backToMainMenu(requireActivity());
+            } catch (Throwable th) {
+                Log.e("InstanceEditor", "Error saving instance", th);
+                new AlertDialog.Builder(requireContext())
+                        .setTitle("Error al guardar")
+                        .setMessage("No se pudo guardar la configuración de la instancia:\n\n" + (th.getMessage() != null ? th.getMessage() : th.toString()))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show();
+            }
         });
 
         mDeleteButton.setOnClickListener(v -> {
@@ -199,25 +211,55 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
         mSharedDataCheckbox = view.findViewById(R.id.vprof_editor_data_checkbox_container);
     }
 
-    private void save(){
-        mInstance.name = mDefaultName.getText().toString();
-        mInstance.jvmArgs = mDefaultJvmArgument.getText().toString();
-
-        if(mInstance.controlLayout.isEmpty()) mInstance.controlLayout = null;
-        if(mInstance.jvmArgs.isEmpty()) mInstance.jvmArgs = null;
-
-        Runtime selectedRuntime = (Runtime) mDefaultRuntime.getSelectedItem();
-        mInstance.selectedRuntime = (selectedRuntime.name.equals("<Default>") || selectedRuntime.versionString == null)
-                ? null : selectedRuntime.name;
-
-        if(mDefaultRenderer.getSelectedItemPosition() == mRenderNames.size()) mInstance.renderer = null;
-        else mInstance.renderer = mRenderNames.get(mDefaultRenderer.getSelectedItemPosition());
-
-        try {
-            mInstance.write();
-        }catch (IOException e) {
-            Tools.showErrorRemote(e);
+    private void save() throws IOException {
+        if(mInstance == null) {
+            throw new IOException("No hay ninguna instancia cargada para guardar.");
         }
+
+        if(mDefaultName != null && mDefaultName.getText() != null) {
+            String name = mDefaultName.getText().toString().trim();
+            if(!name.isEmpty()) {
+                mInstance.name = name;
+            }
+        }
+
+        if(mDefaultJvmArgument != null && mDefaultJvmArgument.getText() != null) {
+            String jvmArgs = mDefaultJvmArgument.getText().toString().trim();
+            mInstance.jvmArgs = jvmArgs.isEmpty() ? null : jvmArgs;
+        }
+
+        if(mSelectedControlLayout != null) {
+            mInstance.controlLayout = mSelectedControlLayout.isEmpty() ? null : mSelectedControlLayout;
+        } else if(mInstance.controlLayout != null && mInstance.controlLayout.isEmpty()) {
+            mInstance.controlLayout = null;
+        }
+
+        if(mDefaultVersion != null && mDefaultVersion.getText() != null) {
+            String versionId = mDefaultVersion.getText().toString().trim();
+            if(!versionId.isEmpty()) {
+                mInstance.versionId = versionId;
+            }
+        }
+
+        if(mDefaultRuntime != null) {
+            Object selectedRuntimeObj = mDefaultRuntime.getSelectedItem();
+            if(selectedRuntimeObj instanceof Runtime) {
+                Runtime selectedRuntime = (Runtime) selectedRuntimeObj;
+                mInstance.selectedRuntime = (selectedRuntime.name == null || selectedRuntime.name.equals("<Default>") || selectedRuntime.versionString == null)
+                        ? null : selectedRuntime.name;
+            }
+        }
+
+        if(mDefaultRenderer != null && mRenderNames != null) {
+            int selectedPos = mDefaultRenderer.getSelectedItemPosition();
+            if(selectedPos < 0 || selectedPos >= mRenderNames.size()) {
+                mInstance.renderer = null; // Global default
+            } else {
+                mInstance.renderer = mRenderNames.get(selectedPos);
+            }
+        }
+
+        mInstance.write();
     }
 
     @Override

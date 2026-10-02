@@ -26,6 +26,41 @@ typedef struct {
     JavaVM *vm;
 } java_vm_t;
 
+typedef struct {
+    char** items;
+    int count;
+    int capacity;
+} arg_list_t;
+
+static void arg_list_init(arg_list_t* list) {
+    list->capacity = 32;
+    list->count = 0;
+    list->items = (char**) malloc(list->capacity * sizeof(char*));
+}
+
+static void arg_list_add(arg_list_t* list, const char* str) {
+    if(list->items == NULL) return;
+    if(list->count >= list->capacity) {
+        list->capacity *= 2;
+        char** new_items = (char**) realloc(list->items, list->capacity * sizeof(char*));
+        if(new_items == NULL) return;
+        list->items = new_items;
+    }
+    list->items[list->count++] = strdup(str);
+}
+
+static void arg_list_free(arg_list_t* list) {
+    if(list->items != NULL) {
+        for(int i = 0; i < list->count; i++) {
+            if(list->items[i] != NULL) free(list->items[i]);
+        }
+        free(list->items);
+        list->items = NULL;
+    }
+    list->count = 0;
+    list->capacity = 0;
+}
+
 extern void setup_abort_wait();
 extern _Noreturn void abort_call(int code, bool is_signal);
 
@@ -111,22 +146,69 @@ static bool initializeJavaVM(java_vm_t* java_vm, JNIEnv *env, jstring* vmpath, j
     }
 
     jint userArgsCount = (*env)->GetArrayLength(env, java_args);
-    jint javaVmArgsCount = userArgsCount + 2; // for exit and abort hooks
-    JavaVMOption javaVmOptions[javaVmArgsCount];
-
     const char** user_args = convert_to_char_array(env, java_args);
     if(user_args == NULL) FAIL("Failed to read user arguments")
+
+    arg_list_t expanded_args;
+    arg_list_init(&expanded_args);
+
     for(jint i = 0; i < userArgsCount; i++) {
         const char* arg = user_args[i];
-        LOGI("VM arg: %s",arg);
-        if(arg == NULL) FAIL("Unexpected NULL argument")
-        javaVmOptions[i].optionString = arg;
+        if(arg == NULL) {
+            arg_list_free(&expanded_args);
+            FAIL("Unexpected NULL argument")
+        }
+
+        if(arg[0] == '@') {
+            const char* argFilePath = arg + 1;
+            FILE* f = fopen(argFilePath, "r");
+            if(f != NULL) {
+                char* line = NULL;
+                size_t len = 0;
+                ssize_t nread;
+                while((nread = getline(&line, &len, f)) != -1) {
+                    while(nread > 0 && (line[nread - 1] == '\r' || line[nread - 1] == '\n')) {
+                        line[--nread] = '\0';
+                    }
+                    if(nread == 0) continue;
+
+                    char* val = line;
+                    if(val[0] == '"' && nread >= 2 && val[nread - 1] == '"') {
+                        val[nread - 1] = '\0';
+                        val++;
+                    }
+                    LOGI("VM arg (from %s): %s", argFilePath, val);
+                    arg_list_add(&expanded_args, val);
+                }
+                if(line != NULL) free(line);
+                fclose(f);
+            } else {
+                LOGE("Could not open JVM argfile: %s", argFilePath);
+                LOGI("VM arg: %s", arg);
+                arg_list_add(&expanded_args, arg);
+            }
+        } else {
+            LOGI("VM arg: %s", arg);
+            arg_list_add(&expanded_args, arg);
+        }
     }
 
-    javaVmOptions[userArgsCount].optionString = "exit";
-    javaVmOptions[userArgsCount].extraInfo = vm_exit;
-    javaVmOptions[userArgsCount + 1].optionString = "abort";
-    javaVmOptions[userArgsCount + 1].extraInfo = vm_abort;
+    jint javaVmArgsCount = expanded_args.count + 2; // for exit and abort hooks
+    JavaVMOption* javaVmOptions = (JavaVMOption*) malloc(javaVmArgsCount * sizeof(JavaVMOption));
+    if(javaVmOptions == NULL) {
+        arg_list_free(&expanded_args);
+        FAIL("Failed to allocate javaVmOptions")
+    }
+
+    for(jint i = 0; i < expanded_args.count; i++) {
+        javaVmOptions[i].optionString = expanded_args.items[i];
+        javaVmOptions[i].extraInfo = NULL;
+    }
+
+    javaVmOptions[expanded_args.count].optionString = "exit";
+    javaVmOptions[expanded_args.count].extraInfo = vm_exit;
+    javaVmOptions[expanded_args.count + 1].optionString = "abort";
+    javaVmOptions[expanded_args.count + 1].extraInfo = vm_abort;
 
     JavaVMInitArgs initArgs;
     initArgs.nOptions = javaVmArgsCount;
@@ -139,6 +221,8 @@ static bool initializeJavaVM(java_vm_t* java_vm, JNIEnv *env, jstring* vmpath, j
     jint result = java_vm->JNI_CreateJavaVM(&java_vm->vm, &java_vm->vm_env, &initArgs);
     vm_hinter_free(&vh, hasJavaAgents);
 
+    free(javaVmOptions);
+    arg_list_free(&expanded_args);
     free_char_array(env, java_args, user_args);
 
     if(result < 0) {
